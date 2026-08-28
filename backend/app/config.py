@@ -14,6 +14,14 @@ class Settings(BaseSettings):
     ocr_dpi: int = 300
     tesseract_cmd: str | None = None
 
+    # Phase 4 — Evidence layer scoring
+    evidence_textrank_weight: float = 0.5
+    evidence_tfidf_weight: float = 0.3
+    evidence_entity_weight: float = 0.2
+    evidence_textrank_top_k: int = 5
+    evidence_textrank_threshold: float = 0.1
+    evidence_max_sentences_for_textrank: int = 800  # tunable cap; see extract.py docstring
+
     # Placeholders for future phases — not used yet
     # gemini_api_key: str | None = None
     # embedding_model: str = "BAAI/bge-m3"
