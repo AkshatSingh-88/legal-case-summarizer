@@ -12,6 +12,7 @@ Phase 1 contains only: FastAPI app factory, config, health endpoint, logging, pr
 
 - Python 3.10+
 - pip (or uv/pipx)
+- Tesseract 5 executable (for OCR) — see OCR section below
 
 ## Setup
 
@@ -53,6 +54,16 @@ Open http://127.0.0.1:8000/ and http://127.0.0.1:8000/api/health
 pytest -v
 ```
 
+## OCR — Tesseract 5 (Phase 3)
+
+Page-level conditional OCR: native text extracted first via PyMuPDF; OCR attempted only if text is empty/error or `char_count < OCR_CHAR_THRESHOLD (100)` or `word_count < OCR_WORD_THRESHOLD (15)`. Good native pages skip rendering/OCR for performance.
+
+- **Install Tesseract 5:** Windows: `https://github.com/UB-Mannheim/tesseract/wiki` (add to PATH); macOS: `brew install tesseract`; Linux: `apt install tesseract-ocr`
+- **Verify:** `tesseract --version` and `python -c "import pytesseract; print(pytesseract.get_tesseract_version())"`
+- **Executable path:** If not on PATH, set `TESSERACT_CMD` in `.env` to full binary path.
+- **Language:** `OCR_LANGUAGE` in `.env` (default `eng`); for Indic packs install language data and use e.g. `eng+hin`.
+- **Unit tests** mock OCR and do not require Tesseract installed; integration test is separately marked.
+
 ## Project structure
 
 ```
@@ -63,7 +74,11 @@ backend/app/
   api/             # routing only
     health.py
     router.py
-  ingestion/       # future: page-level PDF + conditional OCR (Tesseract 5)
+  ingestion/       # page-level PDF + conditional OCR (Tesseract 5)
+    models.py      # IngestedPage
+    quality.py     # analyze_quality, thresholds
+    ocr.py         # ocr_image boundary (replaceable)
+    pdf.py         # ingest_pdf with OCR gate + rendering
   nlp/             # future: TF-IDF, TextRank, NER, legal extraction
   chunking/        # future: adaptive evidence-aware chunking
   embeddings/      # future: BGE-M3 (configurable)
@@ -74,6 +89,8 @@ backend/app/
   pdfgen/          # future: detailed summary -> PDF
 tests/
   test_health.py
+  test_ingestion.py
+  test_ocr.py
 ```
 
 ## Notes

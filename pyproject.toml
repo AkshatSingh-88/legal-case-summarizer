@@ -10,6 +10,8 @@ dependencies = [
     "pydantic>=2.6.0",
     "pydantic-settings>=2.1.0",
     "pymupdf>=1.23.0",
+    "pytesseract>=0.3.10",
+    "pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]
@@ -22,6 +24,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = ["integration: requires local Tesseract"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["backend"]

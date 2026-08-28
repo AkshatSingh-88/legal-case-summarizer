@@ -1,6 +1,7 @@
-"""PDF page-level ingestion — public surface for Phase 2."""
+"""PDF page-level ingestion — public surface."""
 
 from backend.app.ingestion.models import IngestedPage
+from backend.app.ingestion.ocr import ocr_image, pixmap_to_image
 from backend.app.ingestion.pdf import ingest_pdf, ingest_pdf_bytes, ingest_pdfs
 from backend.app.ingestion.quality import QualityInfo, analyze_quality
 
@@ -11,4 +12,6 @@ __all__ = [
     "ingest_pdf",
     "ingest_pdf_bytes",
     "ingest_pdfs",
+    "ocr_image",
+    "pixmap_to_image",
 ]

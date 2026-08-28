@@ -7,7 +7,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_prefix: str = "/api"
 
-    # Placeholders for future phases — not used in Phase 1
+    # Phase 3 — OCR (Tesseract 5)
+    ocr_language: str = "eng"
+    ocr_char_threshold: int = 100
+    ocr_word_threshold: int = 15
+    ocr_dpi: int = 300
+    tesseract_cmd: str | None = None
+
+    # Placeholders for future phases — not used yet
     # gemini_api_key: str | None = None
     # embedding_model: str = "BAAI/bge-m3"
 
