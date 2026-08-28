@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     chunk_overlap_tokens: int = 0
     chunk_min_tokens: int = 400
 
+    # Phase 6 — Embeddings (foundation, fake provider)
+    embedding_provider: str = "fake"
+    embedding_model: str = "fake-32"
+    embedding_batch_size: int = 32
+    embedding_normalize: bool = True
+    embedding_dimension: int | None = None
+
     # Placeholders for future phases — not used yet
     # gemini_api_key: str | None = None
     # embedding_model: str = "BAAI/bge-m3"
