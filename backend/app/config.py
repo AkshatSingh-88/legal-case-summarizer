@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     evidence_textrank_threshold: float = 0.1
     evidence_max_sentences_for_textrank: int = 800  # tunable cap; see extract.py docstring
 
+    # Phase 5 — Adaptive chunking (evidence-aware, provider-agnostic)
+    chunk_max_tokens: int = 1500
+    chunk_overlap_tokens: int = 0
+    chunk_min_tokens: int = 400
+
     # Placeholders for future phases — not used yet
     # gemini_api_key: str | None = None
     # embedding_model: str = "BAAI/bge-m3"
