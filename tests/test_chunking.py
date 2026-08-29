@@ -276,7 +276,7 @@ def test_ocr_text_treated_normally():
 
 def test_no_pdf_reopening():
     pages = [make_page(text=LONG_PARA)]
-    with patch("fitz.open") as mock_open:
+    with patch("pymupdf.open") as mock_open:
         build_chunks(pages, [])
         mock_open.assert_not_called()
 
@@ -330,3 +330,4 @@ def test_evidence_aware_slack():
     chunks2 = build_chunks(pages2, ev2)
     # With 10% slack (1650), 1430+30=1460 should stay together in one chunk, not split
     assert len(chunks2) == 1
+

@@ -1,4 +1,4 @@
-import fitz
+import pymupdf
 import pytest
 from pathlib import Path
 from unittest.mock import patch
@@ -20,13 +20,13 @@ LONG_TEXT_2 = (
 
 def create_pdf(path: Path, page_texts: list[str | None]):
     """Create a PDF with one entry per page. None = empty page, string = text page."""
-    doc = fitz.open()
+    doc = pymupdf.open()
     for text in page_texts:
         page = doc.new_page()
         if text is not None:
             page.insert_text((72, 72), text)
         else:
-            page.draw_rect(fitz.Rect(50, 50, 200, 200), color=(0, 0, 0))
+            page.draw_rect(pymupdf.Rect(50, 50, 200, 200), color=(0, 0, 0))
     doc.save(str(path))
     doc.close()
 

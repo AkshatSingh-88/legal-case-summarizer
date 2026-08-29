@@ -34,8 +34,21 @@ class Settings(BaseSettings):
     embedding_normalize: bool = True
     embedding_dimension: int | None = None
 
+    # Phase 7 — LLM chunk analysis (real API, fake default)
+    llm_provider: str = "fake"
+    llm_model: str = "fake-json"
+    llm_temperature: float = 0.0
+    llm_max_output_tokens: int = 2048
+    llm_timeout: int = 30
+    llm_max_concurrency: int = 5
+    llm_gemini_rpm: int = 10
+    llm_mistral_rpm: int = 2
+    mistral_free_mode_only: bool = True
+    gemini_api_key: str | None = None
+    mistral_api_key: str | None = None
+    anthropic_api_key: str | None = None
+
     # Placeholders for future phases — not used yet
-    # gemini_api_key: str | None = None
     # embedding_model: str = "BAAI/bge-m3"
 
     model_config = SettingsConfigDict(

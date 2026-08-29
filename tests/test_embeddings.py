@@ -172,7 +172,7 @@ def test_provider_failure_handling():
 
 def test_no_pdf_reopening():
     chunks = [make_chunk(text="Some chunk text")]
-    with patch("fitz.open") as mock_open:
+    with patch("pymupdf.open") as mock_open:
         embed_chunks(chunks)
         mock_open.assert_not_called()
 
@@ -205,3 +205,4 @@ def test_provider_boundary_fake_only():
     from backend.app.embeddings.model import get_provider
     with pytest.raises(ValueError, match="Unknown embedding provider"):
         get_provider("bge-m3", "fake-32", True, None)
+

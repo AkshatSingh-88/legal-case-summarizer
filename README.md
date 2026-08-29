@@ -93,8 +93,23 @@ tests/
   test_ocr.py
 ```
 
+## LLM — Chunk Analysis (Phase 7)
+
+Real API providers are available but **fake remains the default** for tests/CI.
+
+- **Providers:** `fake` (deterministic, no SDK), `gemini` (PRIMARY, default model `gemini-3.5-flash-lite` — high-throughput lightweight Flash for chunk analysis, substantially higher free-tier RPD than 3.6 Flash, Free Tier via Google AI Studio, configurable RPM via `llm_gemini_rpm`), `mistral` (SPEED, `mistral-small-latest`, Experiment 1B/month free then paid, 2 RPM), `claude` (architecture-ready, no $0 free API — requires paid `ANTHROPIC_API_KEY`).
+- **Env vars:** `GEMINI_API_KEY`, `MISTRAL_API_KEY` (never committed), `llm_provider`, `llm_model` (configurable, no code change to switch), `llm_max_concurrency=5` plus `llm_gemini_rpm=10`/`llm_mistral_rpm=2` provider throttling.
+- **Free-tier safety:** `fake` default → no external send; real provider without key → `ConfigurationError` (no silent fallback to fake); Mistral `mistral_free_mode_only=True` blocks paid transition after 1B exhausted.
+- **Manual real-model test (not in pytest):**
+  ```bash
+  pip install -e ".[dev]"  # installs google-genai, mistralai, tenacity
+  GEMINI_API_KEY=... python -m backend.app.llm.manual --provider gemini --model gemini-3.5-flash-lite --limit 3
+  MISTRAL_API_KEY=... python -m backend.app.llm.manual --provider mistral --model mistral-small-latest --limit 3
+  ```
+  Prints `ChunkAnalysis` JSON for manual inspection. Chunk text is sent to external API — legal docs only when you explicitly select real provider.
+- **Config:** `backend/app/config.py` `llm_*` settings; `fake` works offline.
+
 ## Notes
 
-- No OCR/embedding/LLM/Supabase dependencies installed in Phase 1.
 - `application startup` (main.py) is separate from `API routing` (api/).
 - Configuration is isolated in config.py and injected via get_settings().

@@ -185,7 +185,7 @@ def test_multi_page_provenance():
 
 def test_no_pdf_reopened():
     pages = [make_page(text="Some legal text about Supreme Court judgment.")]
-    with patch("fitz.open") as mock_open:
+    with patch("pymupdf.open") as mock_open:
         ev = build_evidence(pages)
         mock_open.assert_not_called()
     assert len(ev) >= 1
@@ -233,3 +233,4 @@ def test_split_sentences_handles_empty():
     assert split_sentences("   ") == []
     assert split_sentences("Hello world") == ["Hello world"]
     assert len(split_sentences("First sentence. Second sentence! Third?")) == 3
+

@@ -1,4 +1,4 @@
-import fitz
+import pymupdf
 import pytest
 from pathlib import Path
 from unittest.mock import patch, Mock
@@ -16,13 +16,13 @@ SHORT_WORDS = "Hello world test"  # 3 words, <15
 
 
 def create_pdf(path: Path, texts: list[str | None]):
-    doc = fitz.open()
+    doc = pymupdf.open()
     for t in texts:
         page = doc.new_page()
         if t is not None:
             page.insert_text((72, 72), t)
         else:
-            page.draw_rect(fitz.Rect(50, 50, 200, 200), color=(0, 0, 0))
+            page.draw_rect(pymupdf.Rect(50, 50, 200, 200), color=(0, 0, 0))
     doc.save(str(path))
     doc.close()
 

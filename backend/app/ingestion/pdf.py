@@ -7,7 +7,7 @@ handled correctly. A single page failure does not abort the document.
 import logging
 from pathlib import Path
 
-import fitz  # PyMuPDF
+import pymupdf
 
 from backend.app.config import get_settings
 from backend.app.ingestion.models import IngestedPage
@@ -82,7 +82,7 @@ def ingest_pdf(
     settings = get_settings()
 
     try:
-        doc = fitz.open(str(path))
+        doc = pymupdf.open(str(path))
     except Exception as e:
         raise ValueError(f"Failed to open PDF {filename}: {e}") from e
 
@@ -187,7 +187,7 @@ def ingest_pdf_bytes(
 
     settings = get_settings()
     try:
-        doc = fitz.open(stream=data, filetype="pdf")
+        doc = pymupdf.open(stream=data, filetype="pdf")
     except Exception as e:
         raise ValueError(f"Failed to open PDF bytes {filename}: {e}") from e
 
