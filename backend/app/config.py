@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     file_max_chunks_per_prompt: int = 20
     file_max_tokens: int = 12000
 
+    # Phase 9 — Case-level synthesis
+    case_max_files_per_prompt: int = 10
+    case_max_tokens: int = 16000
+
     # Placeholders for future phases — not used yet
     # embedding_model: str = "BAAI/bge-m3"
 
