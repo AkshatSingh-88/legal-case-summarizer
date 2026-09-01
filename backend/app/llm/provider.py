@@ -16,12 +16,13 @@ LlmProvider = Callable[[list[str]], list[dict]]
 
 
 def _normalize_response(data: dict) -> dict:
-    """Normalize provider JSON to ChunkAnalysis-compatible dict.
+    """Normalize provider JSON to ChunkAnalysis/FileAnalysis-compatible dict.
 
-    Handles Mistral variations:
+    Handles Mistral variations and Phase 8 nested AnalysisItem:
     - list[str] stays, single string -> [string], list[dict] -> list[str], dict -> list[str]
+    - For FileAnalysis (Phase 8): list[dict{text, source_refs}] stays, single dict -> [dict], etc.
     - uncertainty dict -> string
-    Keeps provider-agnostic normalization in one place.
+    Keeps provider-agnostic normalization in one place, backward compatible with Phase 7.
     """
     SEMANTIC_LIST_FIELDS = {
         "facts",
@@ -36,7 +37,12 @@ def _normalize_response(data: dict) -> dict:
         "decisions",
         "important_dates",
         "entities",
+        "findings",
+        "evidence",
     }
+
+    def _is_analysis_item_dict(d: dict) -> bool:
+        return isinstance(d, dict) and "text" in d and "source_refs" in d
 
     normalized: dict = {}
     for k, v in data.items():
@@ -44,51 +50,129 @@ def _normalize_response(data: dict) -> dict:
             if v is None:
                 normalized[k] = None
             elif isinstance(v, str):
-                # Single string -> single-item list
+                # Single string -> single-item list (Phase 7) or single AnalysisItem for Phase 8?
+                # For Phase 8, string without source_refs is wrapped as AnalysisItem with empty refs
+                # Detect Phase 8 context: if caller expects AnalysisItem, string -> [{"text": str, "source_refs": []}]
+                # Heuristic: if k is one of FileAnalysis fields, wrap; for ChunkAnalysis keep as [str]
+                # We keep as [str] for backward compat; FileAnalysis will handle string->AnalysisItem in its own validation if needed
                 normalized[k] = [v]
             elif isinstance(v, dict):
-                # Dict -> list of meaningful string values
-                vals: list[str] = []
-                for vv in v.values():
-                    if isinstance(vv, str) and vv.strip():
-                        vals.append(vv.strip())
-                    elif isinstance(vv, list):
-                        for item in vv:
-                            if isinstance(item, str):
-                                vals.append(item)
-                            elif isinstance(item, dict):
+                # Check if dict is single AnalysisItem (has text/source_refs)
+                if _is_analysis_item_dict(v):
+                    normalized[k] = [v]
+                else:
+                    # Dict -> list of meaningful string values (Phase 7) or list of AnalysisItems?
+                    # Try to extract values; if values are dicts with text/source_refs, keep them
+                    vals: list = []
+                    # If dict values are AnalysisItem-like, collect them
+                    is_nested = any(isinstance(x, dict) and "text" in x for x in v.values())
+                    if is_nested:
+                        for vv in v.values():
+                            if isinstance(vv, dict) and "text" in vv:
+                                vals.append(vv)
+                            elif isinstance(vv, list):
+                                vals.extend(vv)
+                            elif isinstance(vv, str) and vv.strip():
+                                vals.append({"text": vv.strip(), "source_refs": []})
+                    else:
+                        for vv in v.values():
+                            if isinstance(vv, str) and vv.strip():
+                                vals.append(vv.strip())
+                            elif isinstance(vv, list):
+                                for item in vv:
+                                    if isinstance(item, str):
+                                        vals.append(item)
+                                    elif isinstance(item, dict):
+                                        if _is_analysis_item_dict(item):
+                                            vals.append(item)
+                                        else:
+                                            val = item.get("description") or item.get("text") or item.get("content") or item.get("value") or item.get("name") or item.get("statement")
+                                            if val is None:
+                                                for x in item.values():
+                                                    if isinstance(x, str):
+                                                        val = x
+                                                        break
+                                            if val is not None:
+                                                vals.append(str(val))
+                            elif vv is not None:
+                                vals.append(str(vv))
+                    if not vals:
+                        for vv in v.values():
+                            if isinstance(vv, str):
+                                vals.append(vv)
+                    normalized[k] = vals if vals else None
+            elif isinstance(v, list):
+                # Detect Phase 8 nested AnalysisItem list
+                if v and all(isinstance(item, dict) and "text" in item for item in v):
+                    # Already list[AnalysisItem] shape — keep, but normalize source_refs
+                    norm_list: list[dict] = []
+                    for item in v:
+                        # Normalize source_refs to list[str]
+                        refs = item.get("source_refs", [])
+                        if isinstance(refs, str):
+                            refs = [refs]
+                        elif isinstance(refs, dict):
+                            refs = list(refs.values())
+                        elif not isinstance(refs, list):
+                            refs = []
+                        # Ensure refs are strings
+                        refs = [str(r) for r in refs if isinstance(r, (str, int)) or r is not None]
+                        norm_list.append({"text": str(item.get("text", "")), "source_refs": refs})
+                    normalized[k] = norm_list
+                else:
+                    norm_list: list[str] = []
+                    for item in v:
+                        if isinstance(item, dict):
+                            # Check if it's AnalysisItem dict
+                            if _is_analysis_item_dict(item):
+                                norm_list.append(item)  # type: ignore — will be handled as list[dict] for Phase 8
+                                # Actually for Phase 7, dict with description should be flattened
+                                # Distinguish: if dict has source_refs, it's Phase 8; if has description, it's Phase 7
+                                if "source_refs" in item:
+                                    # Keep as AnalysisItem dict, not flattened
+                                    # Remove from norm_list and add as dict to separate handling
+                                    norm_list.pop()
+                                    # Re-add as dict to preserve Phase 8
+                                    if not isinstance(normalized.get(k), list) or (normalized.get(k) and isinstance(normalized[k][0], dict)):
+                                        # Already handling as Phase 8, keep dict
+                                        if k not in normalized or not isinstance(normalized[k], list):
+                                            normalized[k] = []
+                                        # This path shouldn't happen due to above check, but keep
+                                        pass
+                                    # For Phase 7 compatibility, flatten description
+                                    val = item.get("description") or item.get("text") or item.get("content") or item.get("value") or item.get("name") or item.get("statement")
+                                    if val is None:
+                                        for vv in item.values():
+                                            if isinstance(vv, str):
+                                                val = vv
+                                                break
+                                    norm_list.append(str(val) if val is not None else str(item))
+                                else:
+                                    val = item.get("description") or item.get("text") or item.get("content") or item.get("value") or item.get("name") or item.get("statement")
+                                    if val is None:
+                                        for vv in item.values():
+                                            if isinstance(vv, str):
+                                                val = vv
+                                                break
+                                    norm_list.append(str(val) if val is not None else str(item))
+                            else:
                                 val = item.get("description") or item.get("text") or item.get("content") or item.get("value") or item.get("name") or item.get("statement")
                                 if val is None:
-                                    for x in item.values():
-                                        if isinstance(x, str):
-                                            val = x
+                                    for vv in item.values():
+                                        if isinstance(vv, str):
+                                            val = vv
                                             break
-                                if val is not None:
-                                    vals.append(str(val))
-                    elif vv is not None:
-                        vals.append(str(vv))
-                # Fallback: if no string values extracted, try top-level keys
-                if not vals:
-                    for vv in v.values():
-                        if isinstance(vv, str):
-                            vals.append(vv)
-                normalized[k] = vals if vals else None
-            elif isinstance(v, list):
-                norm_list: list[str] = []
-                for item in v:
-                    if isinstance(item, dict):
-                        val = item.get("description") or item.get("text") or item.get("content") or item.get("value") or item.get("name") or item.get("statement")
-                        if val is None:
-                            for vv in item.values():
-                                if isinstance(vv, str):
-                                    val = vv
-                                    break
-                        norm_list.append(str(val) if val is not None else str(item))
-                    elif isinstance(item, str):
-                        norm_list.append(item)
+                                norm_list.append(str(val) if val is not None else str(item))
+                        elif isinstance(item, str):
+                            norm_list.append(item)
+                        else:
+                            norm_list.append(str(item))
+                    # If we detected Phase 8 list[dict] earlier, we already returned; otherwise use norm_list
+                    if v and all(isinstance(item, dict) and "text" in item and "source_refs" in item for item in v):
+                        # Keep as list[AnalysisItem] dicts, not flattened
+                        normalized[k] = v  # type: ignore
                     else:
-                        norm_list.append(str(item))
-                normalized[k] = norm_list
+                        normalized[k] = norm_list
             else:
                 # Unexpected type, coerce to string list
                 normalized[k] = [str(v)]
@@ -220,21 +304,41 @@ def _fake_provider(prompts: list[str]) -> list[dict]:
 # --- Gemini provider ---
 
 # JSON schema for structured output — semantic fields only, provenance is set by us
+# Supports both ChunkAnalysis (flat list[str]) and FileAnalysis (nested AnalysisItem with source_refs)
+_ANALYSIS_ITEM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "text": {"type": "string"},
+        "source_refs": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["text", "source_refs"],
+}
+
+_SEMANTIC_FIELD_SCHEMA = {
+    "anyOf": [
+        {"type": "array", "items": {"type": "string"}},
+        {"type": "array", "items": _ANALYSIS_ITEM_SCHEMA},
+    ]
+}
+
 _GEMINI_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
-        "facts": {"type": "array", "items": {"type": "string"}},
-        "procedural_events": {"type": "array", "items": {"type": "string"}},
-        "issues": {"type": "array", "items": {"type": "string"}},
-        "arguments": {"type": "array", "items": {"type": "string"}},
-        "counterarguments": {"type": "array", "items": {"type": "string"}},
-        "evidence_mentioned": {"type": "array", "items": {"type": "string"}},
-        "legal_provisions": {"type": "array", "items": {"type": "string"}},
-        "court_observations": {"type": "array", "items": {"type": "string"}},
-        "court_reasoning": {"type": "array", "items": {"type": "string"}},
-        "decisions": {"type": "array", "items": {"type": "string"}},
-        "important_dates": {"type": "array", "items": {"type": "string"}},
-        "entities": {"type": "array", "items": {"type": "string"}},
+        "facts": _SEMANTIC_FIELD_SCHEMA,
+        "procedural_events": _SEMANTIC_FIELD_SCHEMA,
+        "issues": _SEMANTIC_FIELD_SCHEMA,
+        "arguments": _SEMANTIC_FIELD_SCHEMA,
+        "counterarguments": _SEMANTIC_FIELD_SCHEMA,
+        "evidence_mentioned": _SEMANTIC_FIELD_SCHEMA,
+        "evidence": _SEMANTIC_FIELD_SCHEMA,
+        "legal_provisions": _SEMANTIC_FIELD_SCHEMA,
+        "court_observations": _SEMANTIC_FIELD_SCHEMA,
+        "court_reasoning": _SEMANTIC_FIELD_SCHEMA,
+        "findings": _SEMANTIC_FIELD_SCHEMA,
+        "decisions": _SEMANTIC_FIELD_SCHEMA,
+        "important_dates": _SEMANTIC_FIELD_SCHEMA,
+        "entities": _SEMANTIC_FIELD_SCHEMA,
+        "document_type": {"type": "string", "enum": ["petition", "reply", "affidavit", "evidence", "order", "judgment", "annexure", "unknown"]},
         "uncertainty": {"type": "string"},
         "confidence": {"type": "number"},
     },

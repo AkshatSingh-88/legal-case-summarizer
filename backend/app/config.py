@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     mistral_api_key: str | None = None
     anthropic_api_key: str | None = None
 
+    # Phase 8 — File-level consolidation
+    file_max_chunks_per_prompt: int = 20
+    file_max_tokens: int = 12000
+
     # Placeholders for future phases — not used yet
     # embedding_model: str = "BAAI/bge-m3"
 
