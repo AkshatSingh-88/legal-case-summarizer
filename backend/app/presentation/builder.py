@@ -338,35 +338,71 @@ def build_detailed_analysis(case_analysis: CaseAnalysis) -> DetailedAnalysis | N
     )
 
 
-def build_presentation(case_analysis: CaseAnalysis) -> ProgressivePresentation:
+def build_presentation(
+    case_analysis: CaseAnalysis | None = None,
+    *,
+    quick_case: CaseAnalysis | None = None,
+    detailed_case: CaseAnalysis | None = None,
+    case_id: str | None = None,
+) -> ProgressivePresentation:
     """Main presentation generator assembling progressive presentation container."""
-    if case_analysis.status == "failed" and case_analysis.case_coverage == 0.0:
-        return ProgressivePresentation(
-            case_id=case_analysis.case_id,
-            status="failed",
-            quick_summary_status="failed",
-            detailed_analysis_status="failed",
-            quick_summary=None,
-            detailed_analysis=None,
-            case_coverage=0.0,
-            confidence=0.0,
-            uncertainty=case_analysis.uncertainty or "Case analysis failed or zero coverage",
-        )
+    # Positional case_analysis backward compatibility
+    if case_analysis is not None:
+        if quick_case is None and detailed_case is None:
+            quick_case = case_analysis
+            detailed_case = case_analysis
+        elif quick_case is None:
+            quick_case = case_analysis
+        elif detailed_case is None:
+            detailed_case = case_analysis
 
-    qs = build_quick_summary(case_analysis)
-    da = build_detailed_analysis(case_analysis)
+    resolved_case_id = case_id
+    if resolved_case_id is None:
+        if quick_case is not None:
+            resolved_case_id = quick_case.case_id
+        elif detailed_case is not None:
+            resolved_case_id = detailed_case.case_id
+        else:
+            resolved_case_id = "unknown_case"
 
-    quick_status = "ready" if qs is not None else "failed"
-    detailed_status = "ready" if da is not None else "failed"
+    qs: QuickSummary | None = None
+    quick_status = "pending"
+    if quick_case is not None:
+        if quick_case.status == "failed" and quick_case.case_coverage == 0.0:
+            quick_status = "failed"
+        else:
+            qs = build_quick_summary(quick_case)
+            quick_status = "ready" if qs is not None else "failed"
+
+    da: DetailedAnalysis | None = None
+    detailed_status = "pending"
+    if detailed_case is not None:
+        if detailed_case.status == "failed" and detailed_case.case_coverage == 0.0:
+            detailed_status = "failed"
+        else:
+            da = build_detailed_analysis(detailed_case)
+            detailed_status = "ready" if da is not None else "failed"
+
+    ref_case = detailed_case or quick_case
+    if ref_case is not None:
+        status = ref_case.status
+        coverage = ref_case.case_coverage
+        confidence = ref_case.confidence
+        uncertainty = ref_case.uncertainty
+    else:
+        status = "failed"
+        coverage = 0.0
+        confidence = 0.0
+        uncertainty = "No case analyses available"
 
     return ProgressivePresentation(
-        case_id=case_analysis.case_id,
-        status=case_analysis.status,
+        case_id=resolved_case_id,
+        status=status,
         quick_summary_status=quick_status,
         detailed_analysis_status=detailed_status,
         quick_summary=qs,
         detailed_analysis=da,
-        case_coverage=case_analysis.case_coverage,
-        confidence=case_analysis.confidence,
-        uncertainty=case_analysis.uncertainty,
+        case_coverage=coverage,
+        confidence=confidence,
+        uncertainty=uncertainty,
     )

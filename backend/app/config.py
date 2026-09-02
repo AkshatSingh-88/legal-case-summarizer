@@ -56,10 +56,14 @@ class Settings(BaseSettings):
     case_max_files_per_prompt: int = 10
     case_max_tokens: int = 16000
 
-    # Phase 10 — Presentation layer
+    # Phase 10 — Presentation layer & Quick corpus budget
     presentation_max_quick_facts: int = 5
     presentation_max_quick_issues: int = 3
     presentation_max_quick_arguments: int = 3
+    quick_corpus_max_tokens_per_doc: int = 3000
+    quick_corpus_max_tokens_total: int = 8000
+    quick_corpus_min_sentences_per_doc: int = 3
+    quick_corpus_tier1_budget_ratio: float = 0.30
 
     # Placeholders for future phases — not used yet
     # embedding_model: str = "BAAI/bge-m3"

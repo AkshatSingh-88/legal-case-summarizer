@@ -519,6 +519,30 @@ def test_progressive_presentation_container():
     assert pres.detailed_analysis is not None
     assert pres.case_coverage == 1.0
     assert pres.confidence == 1.0
+    assert pres.quick_summary.analysis_mode == "quick"
+    assert pres.quick_summary.is_preliminary is True
+    assert "Preliminary summary" in pres.quick_summary.disclaimer
+    assert pres.detailed_analysis.analysis_mode == "detailed"
+    assert pres.detailed_analysis.is_preliminary is False
+
+
+def test_presentation_separate_quick_and_detailed_cases():
+    quick_ca = make_case_analysis(case_id="case-split", case_summary="Quick summary from reduced corpus")
+    detailed_ca = make_case_analysis(case_id="case-split", case_summary="Detailed analysis from full corpus")
+
+    # Both ready
+    pres = build_presentation(quick_case=quick_ca, detailed_case=detailed_ca)
+    assert pres.quick_summary_status == "ready"
+    assert pres.detailed_analysis_status == "ready"
+    assert pres.quick_summary.case_overview == "Quick summary from reduced corpus"
+    assert "Detailed analysis from full corpus" in pres.detailed_analysis.sections[0].text
+
+    # Quick only (detailed pending)
+    pres_quick_only = build_presentation(quick_case=quick_ca, detailed_case=None)
+    assert pres_quick_only.quick_summary_status == "ready"
+    assert pres_quick_only.detailed_analysis_status == "pending"
+    assert pres_quick_only.quick_summary is not None
+    assert pres_quick_only.detailed_analysis is None
 
 
 def test_existing_phases_remain_green():

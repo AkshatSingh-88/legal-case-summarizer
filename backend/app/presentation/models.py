@@ -24,6 +24,14 @@ class QuickSummary(BaseModel):
     uncertainty: str | None = None
     source_refs: list[str]
 
+    analysis_mode: str = "quick"
+    is_preliminary: bool = True
+    disclaimer: str = (
+        "Preliminary summary generated from NLP-selected relevant passages. "
+        "Some contextual details or peripheral facts may be omitted because "
+        "the complete document corpus was not supplied to the analysis model."
+    )
+
 
 class SummarySection(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -53,6 +61,9 @@ class DetailedAnalysis(BaseModel):
     confidence: float
     uncertainty: str | None = None
     meta: dict = Field(default_factory=dict)
+
+    analysis_mode: str = "detailed"
+    is_preliminary: bool = False
 
 
 class ProgressivePresentation(BaseModel):
