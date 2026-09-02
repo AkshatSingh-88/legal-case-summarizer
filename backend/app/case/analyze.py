@@ -242,8 +242,17 @@ def _validate_case_source_refs(
                 resolved_valid.extend(cluster_ref_map[r])
             elif r in valid_refs:
                 resolved_valid.append(r)
+            elif ":" in r:
+                unprefixed = ":".join(r.split(":")[1:])
+                if unprefixed in valid_refs:
+                    resolved_valid.append(unprefixed)
+                elif cluster_ref_map and unprefixed in cluster_ref_map:
+                    resolved_valid.extend(cluster_ref_map[unprefixed])
+                else:
+                    invalid_refs.append(r)
             else:
                 invalid_refs.append(r)
+
 
         if invalid_refs:
             meta_invalid.extend(invalid_refs)
@@ -311,8 +320,17 @@ def _validate_relationships(
                 resolved_valid.extend(cluster_ref_map[r])
             elif r in valid_refs:
                 resolved_valid.append(r)
+            elif ":" in r:
+                unprefixed = ":".join(r.split(":")[1:])
+                if unprefixed in valid_refs:
+                    resolved_valid.append(unprefixed)
+                elif cluster_ref_map and unprefixed in cluster_ref_map:
+                    resolved_valid.extend(cluster_ref_map[unprefixed])
+                else:
+                    invalid_refs.append(r)
             else:
                 invalid_refs.append(r)
+
 
         if invalid_refs:
             meta_invalid.extend(invalid_refs)
@@ -608,6 +626,14 @@ def analyze_case(
     status = "complete" if case_coverage == 1.0 and not failed_doc_ids else "partial"
 
     doc_map, doc_id_to_label, valid_compound_refs = _create_doc_map(successful_files)
+    doc_registry = {
+        doc_label: {
+            "document_id": fa.document_id,
+            "filename": fa.filename,
+            "src_registry": fa.meta.get("src_registry", {}),
+        }
+        for doc_label, fa in doc_map.items()
+    }
 
     # 1. Evaluate candidate prompt for direct single LLM call
     if len(successful_files) <= max_files:
@@ -640,13 +666,13 @@ def analyze_case(
                     status="partial",
                     confidence=0.0,
                     uncertainty=unc,
-                    meta={"error": str(e)},
+                    meta={"error": str(e), "doc_registry": doc_registry},
                     model=model,
                     provider=provider,
                 )
 
             try:
-                return _build_case_analysis_from_llm(
+                ca_direct = _build_case_analysis_from_llm(
                     case_id,
                     file_analyses,
                     doc_map,
@@ -659,6 +685,8 @@ def analyze_case(
                     valid_compound_refs,
                     doc_id_to_label=doc_id_to_label,
                 )
+                ca_direct.meta["doc_registry"] = doc_registry
+                return ca_direct
             except Exception as e:
                 logger.warning(f"Validation failed for direct case analysis: {e}")
                 unc = f"Validation failed during case synthesis: {e}"
@@ -675,7 +703,7 @@ def analyze_case(
                     status="partial",
                     confidence=0.0,
                     uncertainty=unc,
-                    meta={"error": str(e)},
+                    meta={"error": str(e), "doc_registry": doc_registry},
                     model=model,
                     provider=provider,
                 )
@@ -687,14 +715,16 @@ def analyze_case(
     )
 
     def _prompt_for_file_batch(batch_files: list[FileAnalysis]) -> str:
-        b_map, _, _ = _create_doc_map(batch_files)
+        b_map = {doc_id_to_label[fa.document_id]: fa for fa in batch_files}
         return build_case_prompt(case_id, batch_files, b_map, [], 1.0)
 
     leaf_batches = _partition_files(sorted_successful, max_files, max_tokens, _prompt_for_file_batch)
     intermediate_cases: list[CaseAnalysis] = []
 
     for cluster_idx, batch in enumerate(leaf_batches, start=1):
-        b_map, b_doc_to_label, b_valid_refs = _create_doc_map(batch)
+        b_map = {doc_id_to_label[fa.document_id]: fa for fa in batch}
+        b_doc_to_label = {fa.document_id: doc_id_to_label[fa.document_id] for fa in batch}
+        b_valid_refs = {r for r in valid_compound_refs if r.split(":")[0] in b_map}
         cluster_prompt = build_case_prompt(case_id, batch, b_map, [], 1.0)
         try:
             provider_fn = get_llm_provider(provider, model)
@@ -721,6 +751,7 @@ def analyze_case(
             )
             ca_cluster.meta["cluster_orig_refs"] = list(b_valid_refs)
             intermediate_cases.append(ca_cluster)
+
         except Exception as e:
             logger.warning(f"Cluster synthesis call failed: {e}")
             ca_failed = CaseAnalysis(
@@ -762,14 +793,16 @@ def analyze_case(
             cluster_ref_map: dict[str, list[str]] = {}
             valid_refs_set: set[str] = set()
 
+            ca_by_cluster_id = {f"cluster-{idx+1}": ca for idx, ca in enumerate(current_level)}
             for idx, fa in enumerate(batch_fas):
-                c_label = f"DOC-{idx+1:03d}"
-                matched_ca = current_level[idx] if idx < len(current_level) else None
+                c_label = b_doc_to_label.get(fa.document_id, f"DOC-{idx+1:03d}")
+                matched_ca = ca_by_cluster_id.get(fa.document_id)
                 orig_refs = matched_ca.meta.get("cluster_orig_refs", []) if matched_ca else []
                 cluster_ref_map[c_label] = orig_refs
                 valid_refs_set.add(c_label)
                 for r in orig_refs:
                     valid_refs_set.add(r)
+
 
             cluster_prompt = build_case_prompt(case_id, batch_fas, b_map, [], 1.0)
 
@@ -848,4 +881,5 @@ def analyze_case(
     if not final_case.timeline:
         final_case.timeline = _merge_case_timeline(successful_files, doc_id_to_label)
 
+    final_case.meta["doc_registry"] = doc_registry
     return final_case

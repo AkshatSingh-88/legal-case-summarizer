@@ -4,6 +4,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from backend.app.case.models import CaseRelationship, CaseTimelineEvent
 from backend.app.file.models import AnalysisItem
+from backend.app.presentation.citations import (
+    CitedAnalysisItem,
+    CitedRelationship,
+    CitedTimelineEvent,
+    ResolvedCitation,
+)
 
 
 class QuickSummary(BaseModel):
@@ -13,9 +19,9 @@ class QuickSummary(BaseModel):
     case_overview: str
     parties: list[str] | None = None
 
-    key_facts: list[AnalysisItem] | None = None
-    core_issues: list[AnalysisItem] | None = None
-    key_arguments: list[AnalysisItem] | None = None
+    key_facts: list[CitedAnalysisItem] | None = None
+    core_issues: list[CitedAnalysisItem] | None = None
+    key_arguments: list[CitedAnalysisItem] | None = None
 
     current_status: str
     decision_or_disposition: str | None = None
@@ -42,11 +48,12 @@ class SummarySection(BaseModel):
     order: int
 
     text: str | None = None
-    items: list[AnalysisItem] | None = None
-    relationships: list[CaseRelationship] | None = None
-    timeline_events: list[CaseTimelineEvent] | None = None
+    items: list[CitedAnalysisItem] | None = None
+    relationships: list[CitedRelationship] | None = None
+    timeline_events: list[CitedTimelineEvent] | None = None
 
     source_refs: list[str]
+
 
 
 class DetailedAnalysis(BaseModel):

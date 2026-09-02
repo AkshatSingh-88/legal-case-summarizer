@@ -405,6 +405,17 @@ def analyze_file(
         )
 
     global_src_map, global_chunk_to_src = _create_src_map(successful, start_idx=1)
+    src_registry = {
+        src_id: {
+            "chunk_id": ca.chunk_id,
+            "document_id": ca.document_id,
+            "filename": ca.filename,
+            "page_start": ca.page_start,
+            "page_end": ca.page_end,
+            "pages": ca.pages,
+        }
+        for src_id, ca in global_src_map.items()
+    }
 
     # Direct single call if <= max_per_prompt and prompt fits within max_tokens
     if len(successful) <= max_per_prompt:
@@ -418,7 +429,7 @@ def analyze_file(
                 )
             except Exception as e:
                 logger.warning(f"Provider failed for direct file analysis: {e}")
-                return FileAnalysis(
+                fa_prov_err = FileAnalysis(
                     document_id=document_id,
                     filename=doc_chunks[0].filename,
                     chunk_ids=chunk_ids,
@@ -432,13 +443,14 @@ def analyze_file(
                     status="failed" if coverage == 0 else "partial",
                     document_type="unknown",
                     uncertainty=f"provider failed: {e}",
-                    meta={"error": str(e)},
+                    meta={"error": str(e), "src_registry": src_registry},
                     model=model,
                     provider=provider,
                 )
+                return fa_prov_err
 
             try:
-                return _build_file_analysis_from_llm(
+                fa_res = _build_file_analysis_from_llm(
                     document_id,
                     doc_chunks[0].filename,
                     chunk_ids,
@@ -453,9 +465,11 @@ def analyze_file(
                     provider,
                     set(global_src_map.keys()),
                 )
+                fa_res.meta["src_registry"] = src_registry
+                return fa_res
             except Exception as e:
                 logger.warning(f"Validation failed for direct file analysis: {e}")
-                return FileAnalysis(
+                fa_val_err = FileAnalysis(
                     document_id=document_id,
                     filename=doc_chunks[0].filename,
                     chunk_ids=chunk_ids,
@@ -469,10 +483,12 @@ def analyze_file(
                     status="partial",
                     document_type="unknown",
                     uncertainty=f"validation failed: {e}",
-                    meta={"error": str(e)},
+                    meta={"error": str(e), "src_registry": src_registry},
                     model=model,
                     provider=provider,
                 )
+                return fa_val_err
+
 
     # Hierarchical sharding
     sorted_successful = sorted(successful, key=lambda ca: (ca.page_start, ca.chunk_id))
@@ -656,7 +672,9 @@ def analyze_file(
     final.failed_chunk_ids = failed_ids
     final.coverage = coverage
     final.status = status
+    final.meta["src_registry"] = src_registry
     return final
+
 
 
 def analyze_files(
