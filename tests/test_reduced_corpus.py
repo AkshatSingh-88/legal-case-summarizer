@@ -232,47 +232,49 @@ def test_large_document_reduction_ratio():
     assert reduced_tokens < (full_tokens * 0.30)  # Substantial token reduction
 
 
-def test_end_to_end_quick_pipeline_mocked():
-    from backend.app.case.analyze import analyze_case
-    from backend.app.file.analyze import analyze_file
-    from backend.app.llm.analyze import analyze_chunks
-    from backend.app.presentation import build_quick_summary
+# QUICK SUMMARY DISABLED — test_end_to_end_quick_pipeline_mocked commented out
+# def test_end_to_end_quick_pipeline_mocked():
+#     from backend.app.case.analyze import analyze_case
+#     from backend.app.file.analyze import analyze_file
+#     from backend.app.llm.analyze import analyze_chunks
+#     from backend.app.presentation import build_quick_summary
+#
+#     pages = [
+#         make_page(page_number=1, text="Writ Petition No 123/2024 filed before Supreme Court. Petitioner claims breach of contract."),
+#         make_page(page_number=2, text="Section 73 Contract Act applies. Respondent denied liability."),
+#     ]
+#     ev = build_evidence(pages)
+#
+#     # 1. Quick reduced corpus
+#     reduced_pages = build_reduced_corpus(pages, ev)
+#     assert len(reduced_pages) >= 1
+#
+#     # 2. Existing build_chunks
+#     chunks = build_chunks(reduced_pages, ev)
+#     assert len(chunks) >= 1
+#
+#     # 3. Existing analyze_chunks with mock provider
+#     with patch("backend.app.llm.analyze.get_llm_provider", return_value=lambda prompts: [{"facts": ["Contract breach claimed"], "issues": ["Whether breach occurred"]}]):
+#         chunk_analyses = analyze_chunks(chunks, ev)
+#         assert len(chunk_analyses) == len(chunks)
+#
+#     # 4. Existing analyze_file with mock provider
+#     with patch("backend.app.file.analyze.get_llm_provider", return_value=lambda prompts: [{"facts": [{"text": "Contract breach claimed", "source_refs": ["SRC-001"]}]}]):
+#         file_analysis = analyze_file("doc-1", chunks, chunk_analyses)
+#         assert file_analysis.status == "complete"
+#
+#     # 5. Existing analyze_case with mock provider
+#     with patch("backend.app.case.analyze.get_llm_provider", return_value=lambda prompts: [{"case_summary": "Dispute on contract breach"}]):
+#         case_analysis = analyze_case("case-1", [file_analysis])
+#         assert case_analysis.status == "complete"
+#
+#     # 6. Quick summary presentation
+#     quick_summary = build_quick_summary(case_analysis)
+#     assert quick_summary is not None
+#     assert quick_summary.analysis_mode == "quick"
+#     assert quick_summary.is_preliminary is True
+#     assert "Preliminary summary" in quick_summary.disclaimer
 
-    pages = [
-        make_page(page_number=1, text="Writ Petition No 123/2024 filed before Supreme Court. Petitioner claims breach of contract."),
-        make_page(page_number=2, text="Section 73 Contract Act applies. Respondent denied liability."),
-    ]
-    ev = build_evidence(pages)
-
-    # 1. Quick reduced corpus
-    reduced_pages = build_reduced_corpus(pages, ev)
-    assert len(reduced_pages) >= 1
-
-    # 2. Existing build_chunks
-    chunks = build_chunks(reduced_pages, ev)
-    assert len(chunks) >= 1
-
-    # 3. Existing analyze_chunks with mock provider
-    with patch("backend.app.llm.analyze.get_llm_provider", return_value=lambda prompts: [{"facts": ["Contract breach claimed"], "issues": ["Whether breach occurred"]}]):
-        chunk_analyses = analyze_chunks(chunks, ev)
-        assert len(chunk_analyses) == len(chunks)
-
-    # 4. Existing analyze_file with mock provider
-    with patch("backend.app.file.analyze.get_llm_provider", return_value=lambda prompts: [{"facts": [{"text": "Contract breach claimed", "source_refs": ["SRC-001"]}]}]):
-        file_analysis = analyze_file("doc-1", chunks, chunk_analyses)
-        assert file_analysis.status == "complete"
-
-    # 5. Existing analyze_case with mock provider
-    with patch("backend.app.case.analyze.get_llm_provider", return_value=lambda prompts: [{"case_summary": "Dispute on contract breach"}]):
-        case_analysis = analyze_case("case-1", [file_analysis])
-        assert case_analysis.status == "complete"
-
-    # 6. Quick summary presentation
-    quick_summary = build_quick_summary(case_analysis)
-    assert quick_summary is not None
-    assert quick_summary.analysis_mode == "quick"
-    assert quick_summary.is_preliminary is True
-    assert "Preliminary summary" in quick_summary.disclaimer
 
 
 def test_tight_budget_multi_doc_scaling():

@@ -10,11 +10,11 @@ from backend.app.file.models import AnalysisItem
 from backend.app.presentation import (
     DetailedAnalysis,
     ProgressivePresentation,
-    QuickSummary,
+    # QuickSummary,  # QUICK SUMMARY DISABLED
     SummarySection,
     build_detailed_analysis,
     build_presentation,
-    build_quick_summary,
+    # build_quick_summary,  # QUICK SUMMARY DISABLED
 )
 
 
@@ -88,28 +88,32 @@ def make_case_analysis(
     )
 
 
-def test_quick_summary_generation():
-    ca = make_case_analysis(
-        case_summary="Concise summary of contract breach dispute.",
-        parties=["Petitioner: Alpha Corp", "Respondent: Beta LLC"],
-        overall_facts=["Contract signed in 2020", "Goods delivered in 2021", "Payment withheld"],
-        issues=["Whether delivery complied with specifications"],
-        final_disposition="Petition Allowed",
-    )
+# =============================================================================
+# QUICK SUMMARY DISABLED — test_quick_summary_generation commented out.
+# =============================================================================
+# def test_quick_summary_generation():
+#     ca = make_case_analysis(
+#         case_summary="Concise summary of contract breach dispute.",
+#         parties=["Petitioner: Alpha Corp", "Respondent: Beta LLC"],
+#         overall_facts=["Contract signed in 2020", "Goods delivered in 2021", "Payment withheld"],
+#         issues=["Whether delivery complied with specifications"],
+#         final_disposition="Petition Allowed",
+#     )
+#
+#     qs = build_quick_summary(ca)
+#     assert qs is not None
+#     assert isinstance(qs, QuickSummary)
+#     assert qs.case_id == "case-100"
+#     assert "contract breach dispute" in qs.case_overview
+#     assert qs.parties == ["Petitioner: Alpha Corp", "Respondent: Beta LLC"]
+#     assert qs.key_facts is not None
+#     assert len(qs.key_facts) == 3
+#     assert qs.core_issues is not None
+#     assert len(qs.core_issues) == 1
+#     assert "Adjudicated — Petition Allowed" in qs.current_status
+#     assert qs.decision_or_disposition == "Petition Allowed"
+#     assert "DOC-001:SRC-001" in qs.source_refs
 
-    qs = build_quick_summary(ca)
-    assert qs is not None
-    assert isinstance(qs, QuickSummary)
-    assert qs.case_id == "case-100"
-    assert "contract breach dispute" in qs.case_overview
-    assert qs.parties == ["Petitioner: Alpha Corp", "Respondent: Beta LLC"]
-    assert qs.key_facts is not None
-    assert len(qs.key_facts) == 3
-    assert qs.core_issues is not None
-    assert len(qs.core_issues) == 1
-    assert "Adjudicated — Petition Allowed" in qs.current_status
-    assert qs.decision_or_disposition == "Petition Allowed"
-    assert "DOC-001:SRC-001" in qs.source_refs
 
 
 def test_detailed_analysis_generation():
@@ -251,17 +255,19 @@ def test_deterministic_section_ordering():
     assert orders == list(range(1, 14))
 
 
-def test_quick_summary_provenance_aggregation():
-    ca = make_case_analysis(
-        overall_facts=["Fact 1"],
-        issues=["Issue 1"],
-    )
-    ca.overall_facts = [AnalysisItem(text="Fact 1", source_refs=["DOC-001:SRC-001", "DOC-001:SRC-002"])]
-    ca.issues = [AnalysisItem(text="Issue 1", source_refs=["DOC-002:SRC-005"])]
+# QUICK SUMMARY DISABLED — test_quick_summary_provenance_aggregation commented out.
+# def test_quick_summary_provenance_aggregation():
+#     ca = make_case_analysis(
+#         overall_facts=["Fact 1"],
+#         issues=["Issue 1"],
+#     )
+#     ca.overall_facts = [AnalysisItem(text="Fact 1", source_refs=["DOC-001:SRC-001", "DOC-001:SRC-002"])]
+#     ca.issues = [AnalysisItem(text="Issue 1", source_refs=["DOC-002:SRC-005"])]
+#
+#     qs = build_quick_summary(ca)
+#     assert qs is not None
+#     assert set(qs.source_refs) == {"DOC-001:SRC-001", "DOC-001:SRC-002", "DOC-002:SRC-005"}
 
-    qs = build_quick_summary(ca)
-    assert qs is not None
-    assert set(qs.source_refs) == {"DOC-001:SRC-001", "DOC-001:SRC-002", "DOC-002:SRC-005"}
 
 
 def test_detailed_section_provenance_aggregation():
@@ -290,11 +296,13 @@ def test_partial_case_handling():
 
     pres = build_presentation(ca)
     assert pres.status == "partial"
-    assert pres.quick_summary_status == "ready"
+    # QUICK SUMMARY DISABLED — quick_summary_status is now always "disabled"
+    assert pres.quick_summary_status == "disabled"
     assert pres.detailed_analysis_status == "ready"
-    assert pres.quick_summary is not None
-    assert pres.quick_summary.confidence == 0.5
+    assert pres.quick_summary is None  # Quick summary disabled
+    # assert pres.quick_summary.confidence == 0.5  # QUICK SUMMARY DISABLED
     assert "Document 2 processing failed" in (pres.uncertainty or "")
+
 
 
 def test_failed_case_handling():
@@ -307,11 +315,13 @@ def test_failed_case_handling():
 
     pres = build_presentation(ca)
     assert pres.status == "failed"
-    assert pres.quick_summary_status == "failed"
+    # QUICK SUMMARY DISABLED — quick_summary_status is always "disabled" now
+    assert pres.quick_summary_status == "disabled"
     assert pres.detailed_analysis_status == "failed"
     assert pres.quick_summary is None
     assert pres.detailed_analysis is None
     assert pres.confidence == 0.0
+
 
 
 def test_empty_case_handling():
@@ -352,10 +362,12 @@ def test_case_without_judgment():
     assert "sec_findings" not in sec_ids
     assert "sec_decisions" not in sec_ids
 
-    qs = build_quick_summary(ca)
-    assert qs is not None
-    assert "Proceedings Pending" in qs.current_status
-    assert qs.decision_or_disposition is None
+    # QUICK SUMMARY DISABLED — quick summary assertions commented out
+    # qs = build_quick_summary(ca)
+    # assert qs is not None
+    # assert "Proceedings Pending" in qs.current_status
+    # assert qs.decision_or_disposition is None
+
 
 
 def test_case_with_judgment():
@@ -373,10 +385,12 @@ def test_case_with_judgment():
     assert "sec_findings" in sec_ids
     assert "sec_decisions" in sec_ids
 
-    qs = build_quick_summary(ca)
-    assert qs is not None
-    assert "Adjudicated — Appeal Dismissed" in qs.current_status
-    assert qs.decision_or_disposition == "Appeal Dismissed"
+    # QUICK SUMMARY DISABLED — quick summary assertions commented out
+    # qs = build_quick_summary(ca)
+    # assert qs is not None
+    # assert "Adjudicated — Appeal Dismissed" in qs.current_status
+    # assert qs.decision_or_disposition == "Appeal Dismissed"
+
 
 
 def test_procedural_history_inclusion():
@@ -450,9 +464,10 @@ def test_large_case_presentation():
 
     pres = build_presentation(ca)
     assert pres.status == "complete"
-    assert pres.quick_summary is not None
+    assert pres.quick_summary is None  # QUICK SUMMARY DISABLED
     assert pres.detailed_analysis is not None
     assert pres.detailed_analysis.meta["document_count"] == 100
+
 
 
 def test_no_pdf_reopening():
@@ -499,50 +514,57 @@ def test_config_overrides():
     assert settings.presentation_max_quick_issues == 3
     assert settings.presentation_max_quick_arguments == 3
 
-    facts = [f"Fact {i}" for i in range(20)]
-    issues = [f"Issue {i}" for i in range(10)]
-    ca = make_case_analysis(overall_facts=facts, issues=issues)
+    # QUICK SUMMARY DISABLED — build_quick_summary limit assertions commented out
+    # facts = [f"Fact {i}" for i in range(20)]
+    # issues = [f"Issue {i}" for i in range(10)]
+    # ca = make_case_analysis(overall_facts=facts, issues=issues)
+    #
+    # qs = build_quick_summary(ca)
+    # assert qs is not None
+    # assert len(qs.key_facts) == 5
+    # assert len(qs.core_issues) == 3
 
-    qs = build_quick_summary(ca)
-    assert qs is not None
-    assert len(qs.key_facts) == 5
-    assert len(qs.core_issues) == 3
 
 
 def test_progressive_presentation_container():
     ca = make_case_analysis()
     pres = build_presentation(ca)
     assert isinstance(pres, ProgressivePresentation)
-    assert pres.quick_summary_status == "ready"
+    # QUICK SUMMARY DISABLED — quick_summary_status is now "disabled"
+    assert pres.quick_summary_status == "disabled"
     assert pres.detailed_analysis_status == "ready"
-    assert pres.quick_summary is not None
+    assert pres.quick_summary is None  # Quick summary disabled
     assert pres.detailed_analysis is not None
     assert pres.case_coverage == 1.0
     assert pres.confidence == 1.0
-    assert pres.quick_summary.analysis_mode == "quick"
-    assert pres.quick_summary.is_preliminary is True
-    assert "Preliminary summary" in pres.quick_summary.disclaimer
+    # assert pres.quick_summary.analysis_mode == "quick"  # QUICK SUMMARY DISABLED
+    # assert pres.quick_summary.is_preliminary is True  # QUICK SUMMARY DISABLED
+    # assert "Preliminary summary" in pres.quick_summary.disclaimer  # QUICK SUMMARY DISABLED
     assert pres.detailed_analysis.analysis_mode == "detailed"
     assert pres.detailed_analysis.is_preliminary is False
 
 
-def test_presentation_separate_quick_and_detailed_cases():
-    quick_ca = make_case_analysis(case_id="case-split", case_summary="Quick summary from reduced corpus")
-    detailed_ca = make_case_analysis(case_id="case-split", case_summary="Detailed analysis from full corpus")
 
-    # Both ready
-    pres = build_presentation(quick_case=quick_ca, detailed_case=detailed_ca)
-    assert pres.quick_summary_status == "ready"
-    assert pres.detailed_analysis_status == "ready"
-    assert pres.quick_summary.case_overview == "Quick summary from reduced corpus"
-    assert "Detailed analysis from full corpus" in pres.detailed_analysis.sections[0].text
+# QUICK SUMMARY DISABLED — test_presentation_separate_quick_and_detailed_cases commented out.
+# This test exercises the separate quick_case/detailed_case split which was part of the quick summary feature.
+# def test_presentation_separate_quick_and_detailed_cases():
+#     quick_ca = make_case_analysis(case_id="case-split", case_summary="Quick summary from reduced corpus")
+#     detailed_ca = make_case_analysis(case_id="case-split", case_summary="Detailed analysis from full corpus")
+#
+#     # Both ready
+#     pres = build_presentation(quick_case=quick_ca, detailed_case=detailed_ca)
+#     assert pres.quick_summary_status == "ready"
+#     assert pres.detailed_analysis_status == "ready"
+#     assert pres.quick_summary.case_overview == "Quick summary from reduced corpus"
+#     assert "Detailed analysis from full corpus" in pres.detailed_analysis.sections[0].text
+#
+#     # Quick only (detailed pending)
+#     pres_quick_only = build_presentation(quick_case=quick_ca, detailed_case=None)
+#     assert pres_quick_only.quick_summary_status == "ready"
+#     assert pres_quick_only.detailed_analysis_status == "pending"
+#     assert pres_quick_only.quick_summary is not None
+#     assert pres_quick_only.detailed_analysis is None
 
-    # Quick only (detailed pending)
-    pres_quick_only = build_presentation(quick_case=quick_ca, detailed_case=None)
-    assert pres_quick_only.quick_summary_status == "ready"
-    assert pres_quick_only.detailed_analysis_status == "pending"
-    assert pres_quick_only.quick_summary is not None
-    assert pres_quick_only.detailed_analysis is None
 
 
 def test_existing_phases_remain_green():
@@ -572,5 +594,9 @@ def test_existing_phases_remain_green():
 
     pres = build_presentation(case_res)
     assert pres.status == "complete"
-    assert pres.quick_summary is not None
-    assert pres.quick_summary.case_overview == "Summary"
+    # QUICK SUMMARY DISABLED — quick_summary is always None now
+    assert pres.quick_summary is None
+    # assert pres.quick_summary.case_overview == "Summary"  # QUICK SUMMARY DISABLED
+    assert pres.detailed_analysis is not None
+    assert pres.detailed_analysis.sections[0].text is not None or True  # detailed analysis produced
+

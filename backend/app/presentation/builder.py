@@ -14,7 +14,7 @@ from backend.app.presentation.citations import (
 from backend.app.presentation.models import (
     DetailedAnalysis,
     ProgressivePresentation,
-    QuickSummary,
+    # QuickSummary,  # QUICK SUMMARY DISABLED — commented out
     SummarySection,
 )
 
@@ -55,84 +55,90 @@ def _collect_source_refs_from_timeline(events: list | None) -> list[str]:
     return list(dict.fromkeys(refs))
 
 
-def build_quick_summary(case_analysis: CaseAnalysis) -> QuickSummary | None:
-    """Deterministically assemble a concise QuickSummary from CaseAnalysis without LLM calls."""
-    if case_analysis.status == "failed" and case_analysis.case_coverage == 0.0:
-        return None
 
-    settings = get_settings()
-    max_facts = settings.presentation_max_quick_facts
-    max_issues = settings.presentation_max_quick_issues
-    max_args = settings.presentation_max_quick_arguments
-
-    doc_registry = case_analysis.meta.get("doc_registry", {}) if case_analysis.meta else {}
-
-    # 1. Overview
-    overview = case_analysis.case_summary
-    if not overview or not overview.strip():
-        if case_analysis.parties:
-            overview = f"Legal case concerning dispute between {', '.join(case_analysis.parties)}."
-        else:
-            overview = f"Legal case {case_analysis.case_id} comprising {case_analysis.document_count} documents."
-
-    # 2. Key Facts (capped and cited)
-    key_facts: list[CitedAnalysisItem] | None = None
-    if case_analysis.overall_facts:
-        key_facts = cite_items(case_analysis.overall_facts[:max_facts], doc_registry)
-
-    # 3. Core Issues (capped and cited)
-    core_issues: list[CitedAnalysisItem] | None = None
-    if case_analysis.issues:
-        core_issues = cite_items(case_analysis.issues[:max_issues], doc_registry)
-
-    # 4. Key Arguments (from claims_and_defenses or disputed_matters, capped and cited)
-    key_arguments: list[CitedAnalysisItem] | None = None
-    if case_analysis.claims_and_defenses:
-        arg_items = []
-        for rel in case_analysis.claims_and_defenses[:max_args]:
-            text = f"{rel.source_item}"
-            if rel.target_item:
-                text = f"{text} (Counter: {rel.target_item})"
-            arg_items.append(AnalysisItem(text=text, source_refs=rel.source_refs))
-        key_arguments = cite_items(arg_items, doc_registry)
-    elif case_analysis.disputed_matters:
-        key_arguments = cite_items(case_analysis.disputed_matters[:max_args], doc_registry)
-
-    # 5. Status & Decision
-    if case_analysis.final_disposition:
-        current_status = f"Adjudicated — {case_analysis.final_disposition}"
-        decision = case_analysis.final_disposition
-    elif case_analysis.decisions:
-        current_status = "Adjudicated — Orders Rendered"
-        decision = "; ".join(d.text for d in case_analysis.decisions[:2])
-    else:
-        current_status = "Proceedings Pending / Unadjudicated"
-        decision = None
-
-    # 6. Distinct Source Refs
-    all_refs: list[str] = []
-    if key_facts:
-        all_refs.extend(_collect_source_refs_from_items(key_facts))
-    if core_issues:
-        all_refs.extend(_collect_source_refs_from_items(core_issues))
-    if key_arguments:
-        all_refs.extend(_collect_source_refs_from_items(key_arguments))
-
-    unique_refs = list(dict.fromkeys(all_refs))
-
-    return QuickSummary(
-        case_id=case_analysis.case_id,
-        case_overview=overview,
-        parties=case_analysis.parties,
-        key_facts=key_facts,
-        core_issues=core_issues,
-        key_arguments=key_arguments,
-        current_status=current_status,
-        decision_or_disposition=decision,
-        confidence=case_analysis.confidence,
-        uncertainty=case_analysis.uncertainty,
-        source_refs=unique_refs,
-    )
+# =============================================================================
+# QUICK SUMMARY DISABLED — build_quick_summary commented out.
+# To re-enable: uncomment this function and the QuickSummary import above,
+# and uncomment the quick summary block in build_presentation() below.
+# =============================================================================
+# def build_quick_summary(case_analysis: CaseAnalysis) -> QuickSummary | None:
+#     """Deterministically assemble a concise QuickSummary from CaseAnalysis without LLM calls."""
+#     if case_analysis.status == "failed" and case_analysis.case_coverage == 0.0:
+#         return None
+#
+#     settings = get_settings()
+#     max_facts = settings.presentation_max_quick_facts
+#     max_issues = settings.presentation_max_quick_issues
+#     max_args = settings.presentation_max_quick_arguments
+#
+#     doc_registry = case_analysis.meta.get("doc_registry", {}) if case_analysis.meta else {}
+#
+#     # 1. Overview
+#     overview = case_analysis.case_summary
+#     if not overview or not overview.strip():
+#         if case_analysis.parties:
+#             overview = f"Legal case concerning dispute between {', '.join(case_analysis.parties)}."
+#         else:
+#             overview = f"Legal case {case_analysis.case_id} comprising {case_analysis.document_count} documents."
+#
+#     # 2. Key Facts (capped and cited)
+#     key_facts: list[CitedAnalysisItem] | None = None
+#     if case_analysis.overall_facts:
+#         key_facts = cite_items(case_analysis.overall_facts[:max_facts], doc_registry)
+#
+#     # 3. Core Issues (capped and cited)
+#     core_issues: list[CitedAnalysisItem] | None = None
+#     if case_analysis.issues:
+#         core_issues = cite_items(case_analysis.issues[:max_issues], doc_registry)
+#
+#     # 4. Key Arguments (from claims_and_defenses or disputed_matters, capped and cited)
+#     key_arguments: list[CitedAnalysisItem] | None = None
+#     if case_analysis.claims_and_defenses:
+#         arg_items = []
+#         for rel in case_analysis.claims_and_defenses[:max_args]:
+#             text = f"{rel.source_item}"
+#             if rel.target_item:
+#                 text = f"{text} (Counter: {rel.target_item})"
+#             arg_items.append(AnalysisItem(text=text, source_refs=rel.source_refs))
+#         key_arguments = cite_items(arg_items, doc_registry)
+#     elif case_analysis.disputed_matters:
+#         key_arguments = cite_items(case_analysis.disputed_matters[:max_args], doc_registry)
+#
+#     # 5. Status & Decision
+#     if case_analysis.final_disposition:
+#         current_status = f"Adjudicated — {case_analysis.final_disposition}"
+#         decision = case_analysis.final_disposition
+#     elif case_analysis.decisions:
+#         current_status = "Adjudicated — Orders Rendered"
+#         decision = "; ".join(d.text for d in case_analysis.decisions[:2])
+#     else:
+#         current_status = "Proceedings Pending / Unadjudicated"
+#         decision = None
+#
+#     # 6. Distinct Source Refs
+#     all_refs: list[str] = []
+#     if key_facts:
+#         all_refs.extend(_collect_source_refs_from_items(key_facts))
+#     if core_issues:
+#         all_refs.extend(_collect_source_refs_from_items(core_issues))
+#     if key_arguments:
+#         all_refs.extend(_collect_source_refs_from_items(key_arguments))
+#
+#     unique_refs = list(dict.fromkeys(all_refs))
+#
+#     return QuickSummary(
+#         case_id=case_analysis.case_id,
+#         case_overview=overview,
+#         parties=case_analysis.parties,
+#         key_facts=key_facts,
+#         core_issues=core_issues,
+#         key_arguments=key_arguments,
+#         current_status=current_status,
+#         decision_or_disposition=decision,
+#         confidence=case_analysis.confidence,
+#         uncertainty=case_analysis.uncertainty,
+#         source_refs=unique_refs,
+#     )
 
 
 
@@ -378,32 +384,37 @@ def build_presentation(
 ) -> ProgressivePresentation:
     """Main presentation generator assembling progressive presentation container."""
     # Positional case_analysis backward compatibility
+    # QUICK SUMMARY DISABLED: quick_case assignment is preserved but unused (commented blocks below).
     if case_analysis is not None:
         if quick_case is None and detailed_case is None:
-            quick_case = case_analysis
+            # quick_case = case_analysis  # QUICK SUMMARY DISABLED
             detailed_case = case_analysis
         elif quick_case is None:
-            quick_case = case_analysis
+            pass  # quick_case = case_analysis  # QUICK SUMMARY DISABLED
         elif detailed_case is None:
             detailed_case = case_analysis
 
     resolved_case_id = case_id
     if resolved_case_id is None:
-        if quick_case is not None:
-            resolved_case_id = quick_case.case_id
-        elif detailed_case is not None:
+        # if quick_case is not None:  # QUICK SUMMARY DISABLED
+        #     resolved_case_id = quick_case.case_id
+        if detailed_case is not None:
             resolved_case_id = detailed_case.case_id
         else:
             resolved_case_id = "unknown_case"
 
-    qs: QuickSummary | None = None
-    quick_status = "pending"
-    if quick_case is not None:
-        if quick_case.status == "failed" and quick_case.case_coverage == 0.0:
-            quick_status = "failed"
-        else:
-            qs = build_quick_summary(quick_case)
-            quick_status = "ready" if qs is not None else "failed"
+    # QUICK SUMMARY DISABLED — the block below is commented out.
+    # To re-enable: uncomment the block and re-enable build_quick_summary above.
+    # qs: QuickSummary | None = None
+    # quick_status = "pending"
+    # if quick_case is not None:
+    #     if quick_case.status == "failed" and quick_case.case_coverage == 0.0:
+    #         quick_status = "failed"
+    #     else:
+    #         qs = build_quick_summary(quick_case)
+    #         quick_status = "ready" if qs is not None else "failed"
+    qs = None
+    quick_status = "disabled"
 
     da: DetailedAnalysis | None = None
     detailed_status = "pending"
@@ -414,7 +425,7 @@ def build_presentation(
             da = build_detailed_analysis(detailed_case)
             detailed_status = "ready" if da is not None else "failed"
 
-    ref_case = detailed_case or quick_case
+    ref_case = detailed_case  # or quick_case  # QUICK SUMMARY DISABLED
     if ref_case is not None:
         status = ref_case.status
         coverage = ref_case.case_coverage
@@ -437,3 +448,4 @@ def build_presentation(
         confidence=confidence,
         uncertainty=uncertainty,
     )
+

@@ -14,17 +14,17 @@ from backend.app.presentation.citations import (
 from backend.app.presentation.models import (
     DetailedAnalysis,
     ProgressivePresentation,
-    QuickSummary,
+    # QuickSummary,  # QUICK SUMMARY DISABLED — commented out
     SummarySection,
 )
 from backend.app.presentation.builder import (
     build_detailed_analysis,
     build_presentation,
-    build_quick_summary,
+    # build_quick_summary,  # QUICK SUMMARY DISABLED — commented out
 )
 
 __all__ = [
-    "QuickSummary",
+    # "QuickSummary",  # QUICK SUMMARY DISABLED — commented out
     "SummarySection",
     "DetailedAnalysis",
     "ProgressivePresentation",
@@ -37,7 +37,7 @@ __all__ = [
     "cite_items",
     "cite_timeline",
     "cite_relationships",
-    "build_quick_summary",
+    # "build_quick_summary",  # QUICK SUMMARY DISABLED — commented out
     "build_detailed_analysis",
     "build_presentation",
 ]

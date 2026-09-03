@@ -17,7 +17,7 @@ from backend.app.nlp.evidence import build_evidence
 from backend.app.presentation.builder import (
     build_detailed_analysis,
     build_presentation,
-    build_quick_summary,
+    # build_quick_summary,  # QUICK SUMMARY DISABLED
 )
 from backend.app.presentation.citations import (
     CitedAnalysisItem,
@@ -33,7 +33,7 @@ from backend.app.presentation.citations import (
 from backend.app.presentation.models import (
     DetailedAnalysis,
     ProgressivePresentation,
-    QuickSummary,
+    # QuickSummary,  # QUICK SUMMARY DISABLED
     SummarySection,
 )
 
@@ -401,71 +401,73 @@ def test_case_analysis_persists_doc_registry():
 # ==========================================
 
 
-def test_quick_summary_citations(sample_doc_registry):
-    ca = CaseAnalysis(
-        case_id="case-100",
-        document_ids=["doc-petition-123", "doc-reply-456"],
-        document_count=2,
-        documents=[],
-        analyzed_document_ids=["doc-petition-123", "doc-reply-456"],
-        failed_document_ids=[],
-        case_coverage=1.0,
-        status="complete",
-        case_summary="Contract dispute overview",
-        parties=["Petitioner: Alpha", "Respondent: Beta"],
-        overall_facts=[
-            AnalysisItem(text="Contract was executed on 12 Jan 2020", source_refs=["DOC-001:SRC-001"]),
-            AnalysisItem(text="Goods delivered in partial condition", source_refs=["DOC-001:SRC-002"]),
-        ],
-        issues=[AnalysisItem(text="Whether breach was material", source_refs=["DOC-002:SRC-001"])],
-        claims_and_defenses=[
-            CaseRelationship(
-                relationship_id="REL-001",
-                relationship_type="claim_defense",
-                source_document_id="doc-petition-123",
-                source_item="Claim of damages",
-                target_document_id="doc-reply-456",
-                target_item="Counterclaim",
-                status="disputed",
-                source_refs=["DOC-001:SRC-002"],
-            )
-        ],
-        final_disposition="Petition allowed in part",
-        confidence=1.0,
-        uncertainty=None,
-        meta={"doc_registry": sample_doc_registry},
-        model="fake",
-        provider="fake",
-    )
+# QUICK SUMMARY DISABLED — test_quick_summary_citations commented out.
+# def test_quick_summary_citations(sample_doc_registry):
+#     ca = CaseAnalysis(
+#         case_id="case-100",
+#         document_ids=["doc-petition-123", "doc-reply-456"],
+#         document_count=2,
+#         documents=[],
+#         analyzed_document_ids=["doc-petition-123", "doc-reply-456"],
+#         failed_document_ids=[],
+#         case_coverage=1.0,
+#         status="complete",
+#         case_summary="Contract dispute overview",
+#         parties=["Petitioner: Alpha", "Respondent: Beta"],
+#         overall_facts=[
+#             AnalysisItem(text="Contract was executed on 12 Jan 2020", source_refs=["DOC-001:SRC-001"]),
+#             AnalysisItem(text="Goods delivered in partial condition", source_refs=["DOC-001:SRC-002"]),
+#         ],
+#         issues=[AnalysisItem(text="Whether breach was material", source_refs=["DOC-002:SRC-001"])],
+#         claims_and_defenses=[
+#             CaseRelationship(
+#                 relationship_id="REL-001",
+#                 relationship_type="claim_defense",
+#                 source_document_id="doc-petition-123",
+#                 source_item="Claim of damages",
+#                 target_document_id="doc-reply-456",
+#                 target_item="Counterclaim",
+#                 status="disputed",
+#                 source_refs=["DOC-001:SRC-002"],
+#             )
+#         ],
+#         final_disposition="Petition allowed in part",
+#         confidence=1.0,
+#         uncertainty=None,
+#         meta={"doc_registry": sample_doc_registry},
+#         model="fake",
+#         provider="fake",
+#     )
+#
+#     qs = build_quick_summary(ca)
+#     assert qs is not None
+#     assert isinstance(qs, QuickSummary)
+#
+#     # Key facts are CitedAnalysisItem with resolved citations
+#     assert qs.key_facts is not None
+#     assert len(qs.key_facts) == 2
+#     assert isinstance(qs.key_facts[0], CitedAnalysisItem)
+#     assert qs.key_facts[0].source_refs == ["DOC-001:SRC-001"]
+#     assert len(qs.key_facts[0].citations) == 1
+#     assert qs.key_facts[0].citations[0].filename == "petition.pdf"
+#     assert qs.key_facts[0].citations[0].pages == [1, 2]
+#
+#     assert qs.key_facts[1].citations[0].pages == [3, 4, 5]
+#
+#     # Core issues
+#     assert qs.core_issues is not None
+#     assert len(qs.core_issues[0].citations) == 1
+#     assert qs.core_issues[0].citations[0].filename == "reply.pdf"
+#
+#     # Key arguments
+#     assert qs.key_arguments is not None
+#     assert len(qs.key_arguments[0].citations) == 1
+#     assert qs.key_arguments[0].citations[0].filename == "petition.pdf"
+#
+#     # Overview and parties are not mechanically cited
+#     assert qs.case_overview == "Contract dispute overview"
+#     assert qs.parties == ["Petitioner: Alpha", "Respondent: Beta"]
 
-    qs = build_quick_summary(ca)
-    assert qs is not None
-    assert isinstance(qs, QuickSummary)
-
-    # Key facts are CitedAnalysisItem with resolved citations
-    assert qs.key_facts is not None
-    assert len(qs.key_facts) == 2
-    assert isinstance(qs.key_facts[0], CitedAnalysisItem)
-    assert qs.key_facts[0].source_refs == ["DOC-001:SRC-001"]
-    assert len(qs.key_facts[0].citations) == 1
-    assert qs.key_facts[0].citations[0].filename == "petition.pdf"
-    assert qs.key_facts[0].citations[0].pages == [1, 2]
-
-    assert qs.key_facts[1].citations[0].pages == [3, 4, 5]
-
-    # Core issues
-    assert qs.core_issues is not None
-    assert len(qs.core_issues[0].citations) == 1
-    assert qs.core_issues[0].citations[0].filename == "reply.pdf"
-
-    # Key arguments
-    assert qs.key_arguments is not None
-    assert len(qs.key_arguments[0].citations) == 1
-    assert qs.key_arguments[0].citations[0].filename == "petition.pdf"
-
-    # Overview and parties are not mechanically cited
-    assert qs.case_overview == "Contract dispute overview"
-    assert qs.parties == ["Petitioner: Alpha", "Respondent: Beta"]
 
 
 def test_detailed_analysis_citations(sample_doc_registry):
@@ -658,80 +660,81 @@ def test_hierarchical_case_analysis_canonical_resolution():
 
 # ==========================================
 # 6. QUICK MODE VS DETAILED MODE PROVENANCE
+# QUICK SUMMARY DISABLED — entire section commented out
 # ==========================================
 
+# def test_quick_mode_citation_integrity_mocked():
+#     pages = [
+#         IngestedPage(
+#             document_id="doc-quick-1",
+#             filename="quick_petition.pdf",
+#             page_number=1,
+#             text="Writ Petition No 123/2024 filed before Supreme Court. Petitioner claims breach of contract.",
+#             char_count=90,
+#             word_count=13,
+#             is_empty=False,
+#             ocr_used=False,
+#         ),
+#         IngestedPage(
+#             document_id="doc-quick-1",
+#             filename="quick_petition.pdf",
+#             page_number=2,
+#             text="Section 73 Contract Act applies. Damages of Rs 50 Lakhs claimed.",
+#             char_count=65,
+#             word_count=10,
+#             is_empty=False,
+#             ocr_used=False,
+#         ),
+#     ]
+#     ev = build_evidence(pages)
+#
+#     # 1. Quick reduced corpus
+#     reduced_pages = build_reduced_corpus(pages, ev)
+#     assert len(reduced_pages) >= 1
+#
+#     # 2. Existing build_chunks on reduced corpus
+#     chunks = build_chunks(reduced_pages, ev)
+#     assert len(chunks) >= 1
+#
+#     # 3. Analyze chunks
+#     with patch(
+#         "backend.app.llm.analyze.get_llm_provider",
+#         return_value=lambda prompts: [{"facts": ["Contract breach claimed"], "issues": ["Whether breach occurred"]}],
+#     ):
+#         chunk_analyses = analyze_chunks(chunks, ev)
+#
+#     # 4. Analyze file (persists src_registry)
+#     with patch(
+#         "backend.app.file.analyze.get_llm_provider",
+#         return_value=lambda prompts: [{"facts": [{"text": "Contract breach claimed", "source_refs": ["SRC-001"]}]}],
+#     ):
+#         file_analysis = analyze_file("doc-quick-1", chunks, chunk_analyses)
+#         assert "src_registry" in file_analysis.meta
+#         assert "SRC-001" in file_analysis.meta["src_registry"]
+#
+#     # 5. Analyze case (persists doc_registry)
+#     with patch(
+#         "backend.app.case.analyze.get_llm_provider",
+#         return_value=lambda prompts: [
+#             {
+#                 "case_summary": "Dispute on contract breach",
+#                 "overall_facts": [{"text": "Contract breach claimed", "source_refs": ["DOC-001:SRC-001"]}],
+#             }
+#         ],
+#     ):
+#         case_analysis = analyze_case("case-quick-1", [file_analysis])
+#         assert "doc_registry" in case_analysis.meta
+#
+#     # 6. Quick summary presentation with citations
+#     quick_summary = build_quick_summary(case_analysis)
+#     assert quick_summary is not None
+#     assert quick_summary.analysis_mode == "quick"
+#     assert quick_summary.is_preliminary is True
+#     assert quick_summary.key_facts is not None
+#     assert len(quick_summary.key_facts[0].citations) == 1
+#     assert quick_summary.key_facts[0].citations[0].filename == "quick_petition.pdf"
+#     assert quick_summary.key_facts[0].citations[0].page_start in [1, 2]
 
-def test_quick_mode_citation_integrity_mocked():
-    pages = [
-        IngestedPage(
-            document_id="doc-quick-1",
-            filename="quick_petition.pdf",
-            page_number=1,
-            text="Writ Petition No 123/2024 filed before Supreme Court. Petitioner claims breach of contract.",
-            char_count=90,
-            word_count=13,
-            is_empty=False,
-            ocr_used=False,
-        ),
-        IngestedPage(
-            document_id="doc-quick-1",
-            filename="quick_petition.pdf",
-            page_number=2,
-            text="Section 73 Contract Act applies. Damages of Rs 50 Lakhs claimed.",
-            char_count=65,
-            word_count=10,
-            is_empty=False,
-            ocr_used=False,
-        ),
-    ]
-    ev = build_evidence(pages)
-
-    # 1. Quick reduced corpus
-    reduced_pages = build_reduced_corpus(pages, ev)
-    assert len(reduced_pages) >= 1
-
-    # 2. Existing build_chunks on reduced corpus
-    chunks = build_chunks(reduced_pages, ev)
-    assert len(chunks) >= 1
-
-    # 3. Analyze chunks
-    with patch(
-        "backend.app.llm.analyze.get_llm_provider",
-        return_value=lambda prompts: [{"facts": ["Contract breach claimed"], "issues": ["Whether breach occurred"]}],
-    ):
-        chunk_analyses = analyze_chunks(chunks, ev)
-
-    # 4. Analyze file (persists src_registry)
-    with patch(
-        "backend.app.file.analyze.get_llm_provider",
-        return_value=lambda prompts: [{"facts": [{"text": "Contract breach claimed", "source_refs": ["SRC-001"]}]}],
-    ):
-        file_analysis = analyze_file("doc-quick-1", chunks, chunk_analyses)
-        assert "src_registry" in file_analysis.meta
-        assert "SRC-001" in file_analysis.meta["src_registry"]
-
-    # 5. Analyze case (persists doc_registry)
-    with patch(
-        "backend.app.case.analyze.get_llm_provider",
-        return_value=lambda prompts: [
-            {
-                "case_summary": "Dispute on contract breach",
-                "overall_facts": [{"text": "Contract breach claimed", "source_refs": ["DOC-001:SRC-001"]}],
-            }
-        ],
-    ):
-        case_analysis = analyze_case("case-quick-1", [file_analysis])
-        assert "doc_registry" in case_analysis.meta
-
-    # 6. Quick summary presentation with citations
-    quick_summary = build_quick_summary(case_analysis)
-    assert quick_summary is not None
-    assert quick_summary.analysis_mode == "quick"
-    assert quick_summary.is_preliminary is True
-    assert quick_summary.key_facts is not None
-    assert len(quick_summary.key_facts[0].citations) == 1
-    assert quick_summary.key_facts[0].citations[0].filename == "quick_petition.pdf"
-    assert quick_summary.key_facts[0].citations[0].page_start in [1, 2]
 
 
 # ==========================================
