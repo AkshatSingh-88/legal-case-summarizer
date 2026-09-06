@@ -65,8 +65,15 @@ class Settings(BaseSettings):
     quick_corpus_min_sentences_per_doc: int = 3
     quick_corpus_tier1_budget_ratio: float = 0.30
 
-    # Placeholders for future phases — not used yet
-    # embedding_model: str = "BAAI/bge-m3"
+    # Phase B — Database & Storage Foundation (Supabase)
+    supabase_url: str | None = None
+    supabase_service_role_key: str | None = None
+    supabase_documents_bucket: str = "legal-case-documents"
+    max_upload_file_size: int = 50 * 1024 * 1024  # 50 MB per file
+    max_documents_per_case: int = 20
+    max_case_total_size: int = 200 * 1024 * 1024  # 200 MB per case
+    signed_url_expiration_seconds: int = 3600  # 1 hour
+    guest_session_ttl_hours: int = 48
 
     model_config = SettingsConfigDict(
         env_file=".env",

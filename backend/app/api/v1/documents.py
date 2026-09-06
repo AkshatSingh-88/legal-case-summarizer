@@ -1,19 +1,17 @@
-"""V1 Documents router skeleton."""
+"""V1 Documents router implementing multipart upload, document listing, signed URLs, and deletion."""
 
-from datetime import datetime, timezone
-from uuid import UUID, uuid4
-from fastapi import APIRouter, Header, HTTPException, Request, Response, status
+from uuid import UUID
+from fastapi import APIRouter, File, Header, Response, UploadFile, status
 
-from backend.app.api.schemas.case import RetentionType
 from backend.app.api.schemas.document import (
     DocumentAccessResponse,
     DocumentListResponse,
-    DocumentProcessingStatus,
     DocumentResponse,
-    DocumentType,
     DocumentUploadResponse,
-    DocumentUploadResultItem,
 )
+from backend.app.api.schemas.error import StandardErrorResponse
+from backend.app.services.case_service import resolve_ownership_context
+from backend.app.services.document_service import get_document_service
 
 router = APIRouter(tags=["Documents"])
 
@@ -23,47 +21,33 @@ router = APIRouter(tags=["Documents"])
     response_model=DocumentUploadResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Upload Documents to Case",
+    responses={
+        400: {"model": StandardErrorResponse, "description": "Bad Request or Ambiguous Ownership."},
+        401: {"model": StandardErrorResponse, "description": "Unauthorized."},
+        404: {"model": StandardErrorResponse, "description": "Case Not Found."},
+    },
 )
-def upload_documents(
+async def upload_documents(
     case_id: UUID,
-    request: Request,
+    files: list[UploadFile] = File(default=[]),
     authorization: str | None = Header(default=None, description="Bearer <supabase_jwt_token>"),
     x_guest_session_id: str | None = Header(default=None, description="Guest Session Token/ID"),
 ) -> DocumentUploadResponse:
     """Uploads one or more legal PDF files to a Case workspace with per-file result tracking."""
-    now = datetime.now(timezone.utc)
-    sample_doc = DocumentResponse(
-        id=uuid4(),
-        case_id=case_id,
-        filename="petition.pdf",
-        content_type="application/pdf",
-        file_size=245120,
-        document_type=DocumentType.PETITION,
-        document_type_confidence=None,
-        page_count=None,
-        processing_status=DocumentProcessingStatus.UPLOADED,
-        retention_type=RetentionType.PERSISTENT,
-        expires_at=None,
-        created_at=now,
-        updated_at=now,
-    )
-    result_item = DocumentUploadResultItem(
-        filename="petition.pdf",
-        status="uploaded",
-        document=sample_doc,
-        error=None,
-    )
-    return DocumentUploadResponse(
-        results=[result_item],
-        accepted_count=1,
-        failed_count=0,
-    )
+    caller = resolve_ownership_context(authorization, x_guest_session_id)
+    service = get_document_service()
+    return await service.upload_documents(str(case_id), files, caller)
 
 
 @router.get(
     "/cases/{case_id}/documents",
     response_model=DocumentListResponse,
     summary="List Case Documents",
+    responses={
+        400: {"model": StandardErrorResponse, "description": "Ambiguous ownership context."},
+        401: {"model": StandardErrorResponse, "description": "Unauthorized."},
+        404: {"model": StandardErrorResponse, "description": "Case Not Found."},
+    },
 )
 def list_case_documents(
     case_id: UUID,
@@ -71,29 +55,20 @@ def list_case_documents(
     x_guest_session_id: str | None = Header(default=None, description="Guest Session Token/ID"),
 ) -> DocumentListResponse:
     """Lists all documents registered in a case."""
-    now = datetime.now(timezone.utc)
-    sample_doc = DocumentResponse(
-        id=UUID("9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"),
-        case_id=case_id,
-        filename="petition.pdf",
-        content_type="application/pdf",
-        file_size=245120,
-        document_type=DocumentType.PETITION,
-        document_type_confidence=None,
-        page_count=12,
-        processing_status=DocumentProcessingStatus.PROCESSED,
-        retention_type=RetentionType.PERSISTENT,
-        expires_at=None,
-        created_at=now,
-        updated_at=now,
-    )
-    return DocumentListResponse(items=[sample_doc])
+    caller = resolve_ownership_context(authorization, x_guest_session_id)
+    service = get_document_service()
+    return service.list_documents(str(case_id), caller)
 
 
 @router.get(
     "/documents/{document_id}",
     response_model=DocumentResponse,
     summary="Get Document Details",
+    responses={
+        400: {"model": StandardErrorResponse, "description": "Ambiguous ownership context."},
+        401: {"model": StandardErrorResponse, "description": "Unauthorized."},
+        404: {"model": StandardErrorResponse, "description": "Document Not Found."},
+    },
 )
 def get_document(
     document_id: UUID,
@@ -101,28 +76,20 @@ def get_document(
     x_guest_session_id: str | None = Header(default=None, description="Guest Session Token/ID"),
 ) -> DocumentResponse:
     """Retrieves metadata and processing status for a single document."""
-    now = datetime.now(timezone.utc)
-    return DocumentResponse(
-        id=document_id,
-        case_id=UUID("c8f3b174-8b6b-4e12-8821-49fa5cf10321"),
-        filename="petition.pdf",
-        content_type="application/pdf",
-        file_size=245120,
-        document_type=DocumentType.PETITION,
-        document_type_confidence=None,
-        page_count=12,
-        processing_status=DocumentProcessingStatus.PROCESSED,
-        retention_type=RetentionType.PERSISTENT,
-        expires_at=None,
-        created_at=now,
-        updated_at=now,
-    )
+    caller = resolve_ownership_context(authorization, x_guest_session_id)
+    service = get_document_service()
+    return service.get_document(str(document_id), caller)
 
 
 @router.get(
     "/documents/{document_id}/access",
     response_model=DocumentAccessResponse,
     summary="Get Document Signed Access URL",
+    responses={
+        400: {"model": StandardErrorResponse, "description": "Ambiguous ownership context."},
+        401: {"model": StandardErrorResponse, "description": "Unauthorized."},
+        404: {"model": StandardErrorResponse, "description": "Document Not Found."},
+    },
 )
 def get_document_access(
     document_id: UUID,
@@ -130,18 +97,20 @@ def get_document_access(
     x_guest_session_id: str | None = Header(default=None, description="Guest Session Token/ID"),
 ) -> DocumentAccessResponse:
     """Generates a short-lived signed URL for accessing the raw PDF in the viewer."""
-    now = datetime.now(timezone.utc)
-    return DocumentAccessResponse(
-        document_id=document_id,
-        access_url="https://storage.supabase.co/storage/v1/object/sign/legal-docs/petition.pdf?token=placeholder_token",
-        expires_at=now,
-    )
+    caller = resolve_ownership_context(authorization, x_guest_session_id)
+    service = get_document_service()
+    return service.get_document_access(str(document_id), caller)
 
 
 @router.delete(
     "/documents/{document_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete Document",
+    responses={
+        400: {"model": StandardErrorResponse, "description": "Ambiguous ownership context."},
+        401: {"model": StandardErrorResponse, "description": "Unauthorized."},
+        404: {"model": StandardErrorResponse, "description": "Document Not Found."},
+    },
 )
 def delete_document(
     document_id: UUID,
@@ -149,4 +118,7 @@ def delete_document(
     x_guest_session_id: str | None = Header(default=None, description="Guest Session Token/ID"),
 ) -> Response:
     """Deletes a document and purges its blob from storage."""
+    caller = resolve_ownership_context(authorization, x_guest_session_id)
+    service = get_document_service()
+    service.delete_document(str(document_id), caller)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

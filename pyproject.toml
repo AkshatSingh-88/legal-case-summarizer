@@ -16,6 +16,8 @@ dependencies = [
     "google-genai>=0.3.0",
     "mistralai>=1.0.0",
     "tenacity>=8.2.0",
+    "supabase>=2.0.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]

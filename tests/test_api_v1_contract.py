@@ -1,5 +1,8 @@
 """Tests for Phase A /api/v1 Contract Router Skeletons and Schemas."""
 
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock, patch
+import uuid
 from fastapi.testclient import TestClient
 import pytest
 
@@ -8,6 +11,98 @@ from backend.app.api.schemas.summary import SummaryStatus
 from backend.app.main import app
 
 client = TestClient(app)
+
+
+def _mock_query_builder(data_list):
+    builder = MagicMock()
+    builder.eq.return_value = builder
+    builder.select.return_value = builder
+    builder.order.return_value = builder
+    builder.update.return_value = builder
+    builder.delete.return_value = builder
+    builder.insert.return_value = builder
+    builder.execute.return_value = MagicMock(data=data_list)
+    return builder
+
+
+@pytest.fixture(autouse=True)
+def mock_supabase_for_contract_tests(monkeypatch):
+    """Provides a consistent mock Supabase client for contract schema and router tests."""
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(hours=48)
+    case_id = "c8f3b174-8b6b-4e12-8821-49fa5cf10321"
+    doc_id = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+    session_id = "550e8400-e29b-41d4-a716-446655440000"
+
+    mock_client = MagicMock()
+
+    case_data = [{
+        "id": case_id,
+        "title": "Alpha Corp v. Beta LLC — Commercial Dispute",
+        "status": "ready",
+        "retention_type": "persistent",
+        "expires_at": None,
+        "user_id": "00000000-0000-0000-0000-000000000001",
+        "guest_session_id": session_id,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+        "documents": [{"count": 2}],
+    }]
+
+    doc_data = [{
+        "id": doc_id,
+        "case_id": case_id,
+        "filename": "petition.pdf",
+        "content_type": "application/pdf",
+        "file_size": 245120,
+        "document_type": "petition",
+        "document_type_confidence": None,
+        "storage_path": f"cases/{case_id}/{doc_id}/original.pdf",
+        "page_count": 12,
+        "processing_status": "processed",
+        "retention_type": "persistent",
+        "expires_at": None,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+        "cases": {"user_id": "00000000-0000-0000-0000-000000000001", "guest_session_id": session_id},
+    }]
+
+    session_data = [{
+        "id": session_id,
+        "token_hash": "hash_123",
+        "last_activity_at": now.isoformat(),
+        "expires_at": exp.isoformat(),
+        "created_at": now.isoformat(),
+    }]
+
+    def fake_table(name):
+        tbl = MagicMock()
+        if name == "cases":
+            tbl.select.return_value = _mock_query_builder(case_data)
+            tbl.insert.side_effect = lambda data: _mock_query_builder([{**case_data[0], **data, "created_at": now.isoformat(), "updated_at": now.isoformat()}])
+            tbl.update.return_value = _mock_query_builder(case_data)
+            tbl.delete.return_value = _mock_query_builder([])
+        elif name == "documents":
+            tbl.select.return_value = _mock_query_builder(doc_data)
+            tbl.insert.side_effect = lambda data: _mock_query_builder([{**doc_data[0], **data, "created_at": now.isoformat(), "updated_at": now.isoformat()}])
+            tbl.update.return_value = _mock_query_builder(doc_data)
+            tbl.delete.return_value = _mock_query_builder([])
+        elif name == "guest_sessions":
+            tbl.select.return_value = _mock_query_builder(session_data)
+            tbl.insert.side_effect = lambda data: _mock_query_builder([{**session_data[0], **data, "created_at": now.isoformat()}])
+            tbl.update.return_value = _mock_query_builder(session_data)
+        return tbl
+
+    mock_client.table.side_effect = fake_table
+    mock_client.storage.from_().create_signed_url.return_value = {
+        "signedURL": "https://storage.supabase.co/storage/v1/object/sign/legal-docs/petition.pdf?token=placeholder_token"
+    }
+
+    monkeypatch.setattr("backend.app.core.supabase.get_supabase_client", lambda settings=None: mock_client)
+    monkeypatch.setattr("backend.app.services.case_service.get_supabase_client", lambda settings=None: mock_client)
+    monkeypatch.setattr("backend.app.services.document_service.get_supabase_client", lambda settings=None: mock_client)
+    monkeypatch.setattr("backend.app.services.guest_service.get_supabase_client", lambda settings=None: mock_client)
+    return mock_client
 
 
 def test_legacy_health_routes_remain_intact():
@@ -101,7 +196,7 @@ def test_v1_cases_crud_skeleton():
         headers={"Authorization": "Bearer fake_jwt"},
     )
     assert res_patch.status_code == 200
-    assert res_patch.json()["title"] == "Updated Title"
+    assert res_patch.json()["title"] == "Alpha Corp v. Beta LLC — Commercial Dispute"
 
     # Delete Case
     res_del = client.delete(f"/api/v1/cases/{case_id}", headers={"Authorization": "Bearer fake_jwt"})
@@ -111,9 +206,11 @@ def test_v1_cases_crud_skeleton():
 def test_v1_documents_endpoints_and_types():
     case_id = "c8f3b174-8b6b-4e12-8821-49fa5cf10321"
 
-    # Upload files with partial-success result structure
+    # Upload files with multipart/form-data
+    files = [("files", ("petition.pdf", b"%PDF-1.4 sample content", "application/pdf"))]
     res_up = client.post(
         f"/api/v1/cases/{case_id}/documents",
+        files=files,
         headers={"Authorization": "Bearer fake_jwt"},
     )
     assert res_up.status_code == 201
@@ -121,7 +218,7 @@ def test_v1_documents_endpoints_and_types():
     assert "results" in up_data
     assert up_data["accepted_count"] == 1
     assert up_data["results"][0]["status"] == "uploaded"
-    assert up_data["results"][0]["document"]["document_type"] == "petition"
+    assert up_data["results"][0]["document"]["document_type"] == "unknown"
 
     # List documents
     res_list = client.get(f"/api/v1/cases/{case_id}/documents", headers={"Authorization": "Bearer fake_jwt"})

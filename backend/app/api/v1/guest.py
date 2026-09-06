@@ -1,8 +1,7 @@
-"""V1 Guest router skeleton."""
+"""V1 Guest router implementing session creation and claim contract."""
 
 from datetime import datetime, timezone
-import secrets
-from uuid import UUID, uuid4
+from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException, status
 
 from backend.app.api.schemas.error import StandardErrorResponse
@@ -10,6 +9,7 @@ from backend.app.api.schemas.guest import (
     GuestClaimResponse,
     GuestSessionResponse,
 )
+from backend.app.services.guest_service import get_guest_service
 
 router = APIRouter(prefix="/guest", tags=["Guest"])
 
@@ -22,16 +22,8 @@ router = APIRouter(prefix="/guest", tags=["Guest"])
 )
 def create_guest_session() -> GuestSessionResponse:
     """Initializes a new temporary guest session with high-entropy credential token and server-side activity/expiry tracking."""
-    now = datetime.now(timezone.utc)
-    # Generate high-entropy, cryptographically secure opaque credential token
-    token = f"gst_{secrets.token_urlsafe(32)}"
-    return GuestSessionResponse(
-        guest_session_id=uuid4(),
-        session_token=token,
-        last_activity_at=now,
-        expires_at=now,
-        created_at=now,
-    )
+    guest_service = get_guest_service()
+    return guest_service.create_session()
 
 
 @router.post(
@@ -71,6 +63,8 @@ def claim_guest_cases(
             },
         )
 
+    # In Phase B: Claim endpoint validates contract presence of both credentials.
+    # Full claim database transfer lifecycle is completed in Phase C with real Auth.
     now = datetime.now(timezone.utc)
     return GuestClaimResponse(
         claimed_case_ids=[UUID("c8f3b174-8b6b-4e12-8821-49fa5cf10321")],
