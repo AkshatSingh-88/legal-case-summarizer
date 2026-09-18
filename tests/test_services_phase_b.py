@@ -113,10 +113,13 @@ def test_ownership_ambiguity_rule():
     assert exc_info.value.detail["error"]["code"] == "UNAUTHORIZED"
 
     # 3. Authenticated only -> CallerContext(role="authenticated")
-    caller_auth = resolve_ownership_context(authorization="Bearer valid_jwt")
+    mock_verifier = MagicMock()
+    mock_verifier.verify_token.return_value = {"sub": "00000000-0000-0000-0000-000000000001"}
+    with patch("backend.app.core.auth.get_jwt_verifier", return_value=mock_verifier):
+        caller_auth = resolve_ownership_context(authorization="Bearer valid_jwt")
     assert caller_auth.is_authenticated is True
     assert caller_auth.is_guest is False
-    assert caller_auth.user_id is not None
+    assert caller_auth.user_id == "00000000-0000-0000-0000-000000000001"
 
 
 def test_expired_guest_token_rejected_in_ownership_resolution():

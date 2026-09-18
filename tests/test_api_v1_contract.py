@@ -98,6 +98,18 @@ def mock_supabase_for_contract_tests(monkeypatch):
         "signedURL": "https://storage.supabase.co/storage/v1/object/sign/legal-docs/petition.pdf?token=placeholder_token"
     }
 
+    mock_verifier = MagicMock()
+    mock_verifier.verify_token.return_value = {
+        "sub": "00000000-0000-0000-0000-000000000001",
+        "email": "lawyer@example.com",
+        "role": "authenticated",
+        "aud": "authenticated",
+        "iss": "https://test.supabase.co/auth/v1",
+    }
+    monkeypatch.setattr("backend.app.core.auth.get_jwt_verifier", lambda: mock_verifier)
+    monkeypatch.setattr("backend.app.api.deps.get_jwt_verifier", lambda: mock_verifier)
+    monkeypatch.setattr("backend.app.api.v1.auth.get_jwt_verifier", lambda: mock_verifier)
+
     monkeypatch.setattr("backend.app.core.supabase.get_supabase_client", lambda settings=None: mock_client)
     monkeypatch.setattr("backend.app.services.case_service.get_supabase_client", lambda settings=None: mock_client)
     monkeypatch.setattr("backend.app.services.document_service.get_supabase_client", lambda settings=None: mock_client)

@@ -2,6 +2,7 @@
 
 from backend.app.api.schemas.auth import UserProfileResponse
 from backend.app.api.schemas.case import (
+    CaseClaimResponse,
     CaseCreateRequest,
     CaseDetailDocumentItem,
     CaseDetailResponse,
@@ -51,6 +52,7 @@ __all__ = [
     "StandardErrorResponse",
     "CaseStatus",
     "RetentionType",
+    "CaseClaimResponse",
     "CaseCreateRequest",
     "CaseUpdateRequest",
     "CaseResponse",

@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from uuid import UUID
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, Response, status
 
 from backend.app.api.schemas.error import StandardErrorResponse
 from backend.app.api.schemas.guest import (
@@ -29,18 +29,23 @@ def create_guest_session() -> GuestSessionResponse:
 @router.post(
     "/claim",
     response_model=GuestClaimResponse,
-    summary="Claim Guest Cases to Authenticated User",
+    deprecated=True,
+    summary="[DEPRECATED] Compatibility stub for guest claim",
     responses={
         400: {"model": StandardErrorResponse, "description": "Missing guest credential header."},
         401: {"model": StandardErrorResponse, "description": "Missing or invalid authenticated JWT."},
     },
 )
 def claim_guest_cases(
+    response: Response,
     authorization: str | None = Header(default=None, description="Bearer <supabase_jwt_token>"),
     x_guest_session_id: str | None = Header(default=None, description="Guest Session Token/ID"),
 ) -> GuestClaimResponse:
-    """Transfers ownership of all cases created under a guest session to the authenticated user."""
-    if not authorization or not authorization.startswith("Bearer "):
+    """Deprecated compatibility stub for guest claim.
+
+    Performs ZERO database mutations. The authoritative claim operation is POST /api/v1/cases/{case_id}/claim.
+    """
+    if not authorization or not authorization.strip().startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
@@ -63,8 +68,9 @@ def claim_guest_cases(
             },
         )
 
-    # In Phase B: Claim endpoint validates contract presence of both credentials.
-    # Full claim database transfer lifecycle is completed in Phase C with real Auth.
+    # Set deprecation header without misleading {case_id} Link
+    response.headers["Deprecation"] = "true"
+
     now = datetime.now(timezone.utc)
     return GuestClaimResponse(
         claimed_case_ids=[UUID("c8f3b174-8b6b-4e12-8821-49fa5cf10321")],

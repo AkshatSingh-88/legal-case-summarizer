@@ -75,6 +75,13 @@ class Settings(BaseSettings):
     signed_url_expiration_seconds: int = 3600  # 1 hour
     guest_session_ttl_hours: int = 48
 
+    # Phase C — Auth & JWT Verification
+    supabase_jwt_algorithm: str = "ES256"
+    supabase_jwt_audience: str = "authenticated"
+    supabase_jwt_issuer: str | None = None
+    supabase_jwks_cache_seconds: int = 300
+    supabase_jwt_leeway_seconds: int = 10
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

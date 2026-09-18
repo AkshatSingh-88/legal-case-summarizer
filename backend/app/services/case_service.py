@@ -8,6 +8,7 @@ import uuid
 from fastapi import HTTPException, status
 
 from backend.app.api.schemas.case import (
+    CaseClaimResponse,
     CaseCreateRequest,
     CaseDetailDocumentItem,
     CaseDetailResponse,
@@ -117,7 +118,11 @@ def resolve_ownership_context(
         )
 
     if has_jwt:
-        user_id = "00000000-0000-0000-0000-000000000001"
+        token = authorization.strip().split(" ", 1)[1].strip() if authorization else ""
+        from backend.app.core.auth import get_jwt_verifier
+        verifier = get_jwt_verifier()
+        payload = verifier.verify_token(token)
+        user_id = str(payload.get("sub"))
         return CallerContext(user_id=user_id, guest_session_id=None, role="authenticated")
 
     if has_guest:
@@ -387,6 +392,186 @@ class CaseService:
 
         # 4. Delete database record (cascades to child tables)
         client.table("cases").delete().eq("id", case_id).execute()
+
+    def claim_case(
+        self,
+        case_id: str,
+        caller: CallerContext,
+        guest_token: str,
+    ) -> CaseClaimResponse:
+        """Atomically claims a guest case for an authenticated user via the claim_guest_case RPC.
+
+        Requirements:
+        - Authenticated caller with verified user_id (extracted from JWT).
+        - Valid guest_token validated via GuestService to obtain guest_session_id.
+        - Calls claim_guest_case RPC using the service-role client.
+        - Translates RPC result codes into standard API HTTP errors.
+        - Returns typed CaseClaimResponse without exposing previous guest session ID.
+        """
+        if not caller or not caller.is_authenticated or not caller.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": {
+                        "code": "UNAUTHORIZED",
+                        "message": "Valid authenticated bearer credentials required to claim case.",
+                        "details": {},
+                    }
+                },
+            )
+
+        if not guest_token or not guest_token.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": {
+                        "code": "MISSING_GUEST_CREDENTIAL",
+                        "message": "X-Guest-Session-ID header is required to claim a guest case.",
+                        "details": {},
+                    }
+                },
+            )
+
+        client = self._require_client()
+        guest_service = get_guest_service(client)
+        session = guest_service.validate_session(guest_token.strip())
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": {
+                        "code": "UNAUTHORIZED",
+                        "message": "Invalid or expired guest session credential.",
+                        "details": {},
+                    }
+                },
+            )
+
+        guest_session_id = str(session["id"])
+
+        try:
+            rpc_res = client.rpc(
+                "claim_guest_case",
+                {
+                    "p_case_id": case_id,
+                    "p_guest_session_id": guest_session_id,
+                    "p_user_id": caller.user_id,
+                },
+            ).execute()
+        except Exception as e:
+            logger.error("Error executing claim_guest_case RPC for case %s: %s", case_id, e)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "error": {
+                        "code": "DATABASE_ERROR",
+                        "message": f"Failed to execute claim operation: {str(e)}",
+                        "details": {},
+                    }
+                },
+            )
+
+        data = rpc_res.data if hasattr(rpc_res, "data") else rpc_res
+        if not data or not isinstance(data, dict):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "error": {
+                        "code": "CLAIM_FAILED",
+                        "message": "Claim RPC returned an empty or invalid response.",
+                        "details": {},
+                    }
+                },
+            )
+
+        code = data.get("code")
+
+        if code == "CASE_NOT_FOUND":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "error": {
+                        "code": "RESOURCE_NOT_FOUND",
+                        "message": f"Case with ID '{case_id}' was not found.",
+                        "details": {},
+                    }
+                },
+            )
+        elif code == "GUEST_SESSION_EXPIRED":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": {
+                        "code": "UNAUTHORIZED",
+                        "message": "Guest session has expired.",
+                        "details": {},
+                    }
+                },
+            )
+        elif code == "GUEST_SESSION_NOT_FOUND":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": {
+                        "code": "UNAUTHORIZED",
+                        "message": "Guest session record not found.",
+                        "details": {},
+                    }
+                },
+            )
+        elif code == "ALREADY_CLAIMED_BY_SELF":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": {
+                        "code": "CASE_ALREADY_CLAIMED",
+                        "message": "This case has already been claimed by your account.",
+                        "details": {},
+                    }
+                },
+            )
+        elif code == "ALREADY_CLAIMED_BY_OTHER":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": {
+                        "code": "CASE_ALREADY_CLAIMED",
+                        "message": "This case is already claimed by another user.",
+                        "details": {},
+                    }
+                },
+            )
+        elif code == "GUEST_OWNERSHIP_MISMATCH":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": {
+                        "code": "CLAIM_OWNERSHIP_MISMATCH",
+                        "message": "This case does not belong to the supplied guest session.",
+                        "details": {},
+                    }
+                },
+            )
+        elif code != "OK":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": {
+                        "code": "CLAIM_REJECTED",
+                        "message": f"Claim operation rejected with status: {code}",
+                        "details": {},
+                    }
+                },
+            )
+
+        claimed_at = _parse_dt(data.get("claimed_at")) or datetime.now(timezone.utc)
+
+        return CaseClaimResponse(
+            case_id=uuid.UUID(str(data["case_id"])),
+            user_id=uuid.UUID(str(data["user_id"])),
+            claimed_at=claimed_at,
+            retention_type=RetentionType.PERSISTENT,
+        )
 
 
 _case_service = CaseService()

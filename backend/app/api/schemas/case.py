@@ -78,3 +78,12 @@ class CaseListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class CaseClaimResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    case_id: UUID
+    user_id: UUID
+    claimed_at: datetime
+    retention_type: RetentionType = RetentionType.PERSISTENT
