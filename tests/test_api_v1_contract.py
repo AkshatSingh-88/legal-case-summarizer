@@ -91,7 +91,81 @@ def mock_supabase_for_contract_tests(monkeypatch):
             tbl.select.return_value = _mock_query_builder(session_data)
             tbl.insert.side_effect = lambda data: _mock_query_builder([{**session_data[0], **data, "created_at": now.isoformat()}])
             tbl.update.return_value = _mock_query_builder(session_data)
+        elif name == "processing_jobs":
+            def pj_insert(data):
+                jid = data.get("id", str(uuid.uuid4()))
+                jobs_store[jid] = dict(data)
+                return _mock_query_builder([jobs_store[jid]])
+
+            def pj_select(*args):
+                b = MagicMock()
+                _queried_id = [None]
+                def eq_fn(col, val):
+                    if col == "id":
+                        _queried_id[0] = str(val)
+                    return b
+                b.eq.side_effect = eq_fn
+                b.in_.return_value = b
+                b.select.return_value = b
+                def exec_fn():
+                    if _queried_id[0] and _queried_id[0] in jobs_store:
+                        return MagicMock(data=[dict(jobs_store[_queried_id[0]])])
+                    return MagicMock(data=[])
+                b.execute.side_effect = exec_fn
+                return b
+
+            def pj_update(data):
+                b = MagicMock()
+                _upd_id = [None]
+                def eq_fn(col, val):
+                    if col == "id":
+                        _upd_id[0] = str(val)
+                    return b
+                b.eq.side_effect = eq_fn
+                def exec_upd():
+                    if _upd_id[0] and _upd_id[0] in jobs_store:
+                        jobs_store[_upd_id[0]].update(data)
+                        return MagicMock(data=[dict(jobs_store[_upd_id[0]])])
+                    return MagicMock(data=[])
+                b.execute.side_effect = exec_upd
+                return b
+
+            tbl.insert.side_effect = pj_insert
+            tbl.select.side_effect = pj_select
+            tbl.update.side_effect = pj_update
+        elif name == "summaries":
+            tbl.select.return_value = _mock_query_builder(summary_data)
+            tbl.insert.side_effect = lambda data: _mock_query_builder([{**summary_data[0], **data}])
+            tbl.update.return_value = _mock_query_builder(summary_data)
         return tbl
+
+    jobs_store = {}
+    summary_id = "e1f2a3b4-5c6d-7e8f-9a0b-1c2d3e4f5a6b"
+    summary_data = [{
+        "id": summary_id,
+        "case_id": case_id,
+        "summary_type": "detailed",
+        "status": "ready",
+        "content": {
+            "case_id": case_id,
+            "section_count": 1,
+            "sections": [{
+                "section_id": "sec_1",
+                "title": "Executive Overview",
+                "section_type": "text",
+                "order": 1,
+                "text": "Commercial dispute.",
+                "source_refs": [],
+            }],
+            "case_coverage": 1.0,
+            "status": "complete",
+            "confidence": 0.95,
+            "analysis_mode": "detailed",
+            "is_preliminary": False,
+        },
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+    }]
 
     mock_client.table.side_effect = fake_table
     mock_client.storage.from_().create_signed_url.return_value = {
@@ -114,6 +188,9 @@ def mock_supabase_for_contract_tests(monkeypatch):
     monkeypatch.setattr("backend.app.services.case_service.get_supabase_client", lambda settings=None: mock_client)
     monkeypatch.setattr("backend.app.services.document_service.get_supabase_client", lambda settings=None: mock_client)
     monkeypatch.setattr("backend.app.services.guest_service.get_supabase_client", lambda settings=None: mock_client)
+    monkeypatch.setattr("backend.app.services.job_service.get_supabase_client", lambda settings=None: mock_client)
+    monkeypatch.setattr("backend.app.services.summary_service.get_supabase_client", lambda settings=None: mock_client)
+    monkeypatch.setattr("backend.app.api.v1.jobs.run_case_job_background", lambda jid: None)
     return mock_client
 
 
